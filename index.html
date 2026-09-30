@@ -1,0 +1,3493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fractal Flame</title>
+<style>
+:root{
+  --fs:13px;
+  --ink:#e7ecf3; --dim:#8e9aab; --dim2:#69748a;
+  --hair:rgba(255,255,255,.10);
+  --panel:#0e1116; --panel2:#151a21;
+  --accent:#ff9a4d; --accent2:#4dc9ff;
+  --w:344px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;width:100%;overflow:hidden;background:#000}
+body{
+  font:400 var(--fs)/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  color:var(--ink);-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none;
+}
+canvas{display:block}
+#stage{position:fixed;inset:0}
+#flame,#glflame,#overlay{position:absolute;left:0;top:0;width:100%;height:100%}
+#glflame{display:none}
+#overlay{touch-action:none;cursor:crosshair}
+body.ssaver #overlay{cursor:none}
+
+/* ---------------- panel ---------------- */
+#panel{
+  position:fixed;left:0;top:0;bottom:0;width:var(--w);z-index:10;
+  background:rgba(14,17,22,.93);border-right:1px solid var(--hair);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  display:flex;flex-direction:column;transition:transform .28s ease;
+}
+body.hideui #panel{transform:translateX(calc(-1 * var(--w) - 4px))}
+body.hideui #status{opacity:0;pointer-events:none}
+body.ssaver #panel,body.ssaver #status,body.ssaver #toast{display:none}
+body.ssaver #overlay{opacity:0}
+
+#head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--hair);flex:0 0 auto}
+#head h1{font-size:14px;font-weight:650;letter-spacing:.01em;flex:1}
+#head h1 span{color:var(--accent)}
+#body{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:0 12px 20px;scrollbar-width:thin}
+#body::-webkit-scrollbar{width:9px}
+#body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:5px}
+
+details{border-bottom:1px solid rgba(255,255,255,.06);padding:2px 0}
+details>summary{
+  list-style:none;cursor:pointer;padding:9px 2px;font-size:11px;font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--dim);display:flex;align-items:center;gap:7px;
+}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"\25B8";font-size:10px;color:var(--dim2);transition:transform .18s}
+details[open]>summary::before{transform:rotate(90deg)}
+details>summary:hover{color:var(--ink)}
+.sect{padding:2px 0 12px}
+
+button{
+  font:inherit;font-size:12px;color:var(--ink);background:rgba(255,255,255,.07);
+  border:1px solid var(--hair);border-radius:7px;padding:6px 9px;cursor:pointer;
+  transition:background .13s,border-color .13s;white-space:nowrap;
+}
+button:hover{background:rgba(255,255,255,.14)}
+button:active{background:rgba(255,255,255,.2)}
+button.on{background:rgba(255,154,77,.20);border-color:rgba(255,154,77,.5);color:#ffd9bb}
+button.pri{background:rgba(255,154,77,.16);border-color:rgba(255,154,77,.36)}
+button:disabled{opacity:.35;cursor:default}
+.btnrow{display:flex;gap:6px;flex-wrap:wrap}
+.btnrow.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.btnrow.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.btnrow.g2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+
+.row{display:grid;grid-template-columns:82px 1fr 46px;align-items:center;gap:8px;margin:7px 0}
+.row>label{color:var(--dim);font-size:12px}
+.row>output{font-size:11px;text-align:right;font-variant-numeric:tabular-nums;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:16px;background:none;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:rgba(255,255,255,.18)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:var(--accent);margin-top:-4.5px}
+input[type=range]::-moz-range-track{height:3px;border-radius:2px;background:rgba(255,255,255,.18)}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border:none;border-radius:50%;background:var(--accent)}
+input[type=number],input[type=text],select,textarea{
+  font:inherit;font-size:12px;color:var(--ink);background:rgba(255,255,255,.06);
+  border:1px solid var(--hair);border-radius:6px;padding:5px 6px;width:100%;
+}
+input[type=number]{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px}
+textarea{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10.5px;
+  resize:vertical;min-height:76px;line-height:1.4}
+select option{background:#12161d}
+input[type=color]{width:100%;height:26px;padding:1px;border:1px solid var(--hair);
+  border-radius:6px;background:rgba(255,255,255,.06);cursor:pointer}
+.chk{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);cursor:pointer;margin:7px 0}
+.chk input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+.note{color:var(--dim2);font-size:11px;line-height:1.45;margin:6px 0 2px}
+
+/* ---------------- transform tabs + variations ---------------- */
+#xtabs{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 10px}
+#xtabs button{padding:5px 9px;font-size:12px;font-variant-numeric:tabular-nums}
+#xtabs button.off{opacity:.42;text-decoration:line-through}
+.affine{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:8px 0}
+.affine label{display:grid;gap:2px}
+.affine span{font-size:10px;color:var(--dim2);letter-spacing:.05em}
+#vhead{display:flex;align-items:center;gap:8px;margin:12px 0 4px}
+#vhead b{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:600;flex:1}
+#vlist{max-height:250px;overflow-y:auto;padding-right:4px;scrollbar-width:thin;
+  border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:6px 8px;background:rgba(0,0,0,.22)}
+#vlist::-webkit-scrollbar{width:8px}
+#vlist::-webkit-scrollbar-thumb{background:rgba(255,255,255,.13);border-radius:4px}
+.vrow{display:grid;grid-template-columns:74px 1fr 34px;align-items:center;gap:7px;margin:3px 0}
+.vrow>label{font-size:11px;color:var(--dim2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vrow.act>label{color:var(--accent2)}
+.vrow>output{font-size:10px;text-align:right;font-variant-numeric:tabular-nums;
+  font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--dim)}
+.vrow.act>output{color:var(--ink)}
+
+/* ---------------- palette editor ---------------- */
+#palwrap{position:relative;margin:8px 0 4px}
+#palbar{width:100%;height:34px;display:block;border-radius:7px;border:1px solid var(--hair);cursor:copy}
+#palstops{position:relative;height:20px;margin-top:2px}
+.stop{position:absolute;top:0;width:13px;height:13px;margin-left:-6.5px;border-radius:50%;
+  border:2px solid #0e1116;box-shadow:0 0 0 1px rgba(255,255,255,.5);cursor:grab;touch-action:none}
+.stop.sel{box-shadow:0 0 0 2px var(--accent),0 0 8px rgba(255,154,77,.7);z-index:3}
+.stopedit{display:grid;grid-template-columns:1fr 74px 34px;gap:6px;align-items:center;margin-top:6px}
+
+/* ---------------- status + overlays ---------------- */
+#status{
+  position:fixed;right:12px;top:12px;z-index:9;padding:8px 11px;border-radius:9px;
+  background:rgba(10,13,18,.72);border:1px solid var(--hair);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;
+  color:var(--dim);line-height:1.6;transition:opacity .3s;pointer-events:none;min-width:172px;
+}
+#status b{color:var(--ink);font-weight:500;float:right;margin-left:14px}
+#toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(14px);z-index:20;
+  padding:9px 16px;border-radius:9px;background:rgba(18,22,29,.95);border:1px solid var(--hair);
+  font-size:12.5px;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;max-width:70vw;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#busy{
+  position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+  background:rgba(4,6,9,.78);backdrop-filter:blur(3px);
+}
+#busy.on{display:flex}
+#busybox{width:min(380px,80vw);padding:20px 22px;border-radius:12px;background:var(--panel2);
+  border:1px solid var(--hair);text-align:center}
+#busybox h3{font-size:14px;font-weight:600;margin-bottom:4px}
+#busybox p{font-size:11.5px;color:var(--dim);margin-bottom:12px}
+#bar{height:5px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;margin-bottom:14px}
+#barfill{height:100%;width:0;background:var(--accent);transition:width .12s linear}
+#err{
+  position:fixed;left:0;right:0;bottom:0;z-index:99;padding:10px 14px;background:#5d1b1b;
+  color:#ffdede;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;
+  display:none;white-space:pre-wrap;max-height:34vh;overflow:auto;
+}
+#hint{
+  position:fixed;left:calc(var(--w) + 14px);bottom:12px;z-index:8;color:var(--dim2);font-size:11px;
+  pointer-events:none;transition:opacity .3s,left .28s ease;
+}
+body.hideui #hint{left:14px}
+#hint{text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.75)}
+body.ssaver #hint{display:none}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="flame"></canvas>
+  <canvas id="glflame"></canvas>
+  <canvas id="overlay"></canvas>
+</div>
+
+<div id="status">
+  <div>samples <b id="stSamples">0</b></div>
+  <div>quality <b id="stQual">0</b></div>
+  <div>rate <b id="stRate">0</b></div>
+  <div>fps <b id="stFps">0</b></div>
+  <div>buffer <b id="stRes">-</b></div>
+</div>
+
+<div id="hint">drag a handle to edit &middot; drag empty space to pan &middot; wheel to zoom &middot; H hides the panel</div>
+<div id="toast"></div>
+<div id="err"></div>
+
+<div id="busy"><div id="busybox">
+  <h3 id="busyTitle">Rendering</h3>
+  <p id="busyMsg">&nbsp;</p>
+  <div id="bar"><div id="barfill"></div></div>
+  <button id="busyCancel">Cancel</button>
+</div></div>
+
+<div id="panel">
+  <div id="head">
+    <h1>Fractal <span>Flame</span></h1>
+    <button id="bUndo" title="Undo (Ctrl+Z)">&#8630;</button>
+    <button id="bRedo" title="Redo (Ctrl+Y)">&#8631;</button>
+    <button id="bHide" title="Hide panel (H)">&#10005;</button>
+  </div>
+  <div id="body">
+
+    <div class="sect">
+      <div class="btnrow g2" style="margin-top:10px">
+        <button id="bRandom" class="pri">Randomize &nbsp;R</button>
+        <button id="bMutate" class="pri">Mutate &nbsp;M</button>
+      </div>
+      <select id="selPreset" style="margin-top:8px"></select>
+      <div class="btnrow g4" style="margin-top:6px">
+        <button id="bPause" title="Pause accumulation (space)">Pause</button>
+        <button id="bFit" title="Fit camera to the attractor">Fit</button>
+        <button id="bSaver" title="Screensaver (S)">Saver</button>
+        <button id="bFull" title="Fullscreen (F)">Full</button>
+      </div>
+    </div>
+
+    <details open>
+      <summary>Tone mapping</summary>
+      <div class="sect">
+        <div class="row"><label>Vibrancy</label><input type="range" id="sVib" min="0" max="1" step="0.01"><output id="oVib"></output></div>
+        <div class="note">0 gammas each channel on its own &rarr; pastel. 1 gammas luminance and scales channels together &rarr; saturated neon.</div>
+        <div class="row"><label>Gamma</label><input type="range" id="sGamma" min="0.5" max="4" step="0.01"><output id="oGamma"></output></div>
+        <div class="row"><label>Brightness</label><input type="range" id="sBright" min="0.1" max="6" step="0.01"><output id="oBright"></output></div>
+        <div class="row"><label>Sparse cut</label><input type="range" id="sSparse" min="0" max="8" step="0.1"><output id="oSparse"></output></div>
+        <div class="note">The log curve makes a pixel hit once nearly as bright as one hit ten times, which shows up as speckle wherever samples are thin. This fades pixels by d/(d+cut) in sample units; 0 is the plain formula.</div>
+        <div class="row"><label>Background</label><input type="color" id="cBg"><output></output></div>
+        <label class="chk"><input type="checkbox" id="kTrans"><span>Transparent background in PNG export</span></label>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Palette</summary>
+      <div class="sect">
+        <select id="selPal"></select>
+        <div id="palwrap">
+          <canvas id="palbar"></canvas>
+          <div id="palstops"></div>
+        </div>
+        <div class="stopedit">
+          <input type="color" id="stopColor">
+          <input type="number" id="stopPos" min="0" max="1" step="0.001">
+          <button id="stopDel" title="Delete stop">&#10005;</button>
+        </div>
+        <div class="note" id="palNote">Click the bar to add a stop, drag to move, select to recolour.</div>
+        <div class="row"><label>Rotation</label><input type="range" id="sPalOff" min="0" max="1" step="0.001"><output id="oPalOff"></output></div>
+        <label class="chk"><input type="checkbox" id="kPalRev"><span>Reverse palette</span></label>
+        <div class="note">To cycle the palette over time, set Palette turns in the Animation section.</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Transforms</summary>
+      <div class="sect">
+        <div id="xtabs"></div>
+        <div class="btnrow g3">
+          <button id="bAddX">+ Add</button>
+          <button id="bDelX">Delete</button>
+          <button id="bTogX">Enable</button>
+        </div>
+        <div class="row"><label>Probability</label><input type="range" id="sXw" min="0.02" max="3" step="0.01"><output id="oXw"></output></div>
+        <div class="row"><label>Colour</label><input type="range" id="sXc" min="0" max="1" step="0.001"><output id="oXc"></output></div>
+        <div class="affine" id="affine"></div>
+        <div class="btnrow g4">
+          <button id="bXreset" title="Reset to identity">Ident</button>
+          <button id="bXrotL" title="Rotate -15 degrees">&#8630;15</button>
+          <button id="bXrotR" title="Rotate +15 degrees">15&#8631;</button>
+          <button id="bXscale" title="Scale 0.9">&#215;0.9</button>
+        </div>
+        <div id="vhead">
+          <b>Variations</b>
+          <button id="bVfilter">Active only</button>
+          <button id="bVclear">Clear</button>
+        </div>
+        <div id="vlist"></div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Final transform</summary>
+      <div class="sect">
+        <label class="chk"><input type="checkbox" id="kFinal"><span>Enable final transform (plot only, no feedback)</span></label>
+        <div class="note">Select the <b>F</b> tab above to edit its affine and variations.</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Animation</summary>
+      <div class="sect">
+        <div class="btnrow g2">
+          <button id="bAnim" class="pri">Animate &nbsp;A</button>
+          <button id="bRec">Record loop</button>
+        </div>
+        <div class="row"><label>Loop</label><input type="range" id="sLoop" min="4" max="120" step="1"><output id="oLoop"></output></div>
+        <div class="row"><label>Turns/loop</label><input type="range" id="sRot" min="0" max="4" step="1"><output id="oRot"></output></div>
+        <div class="row"><label>Pulse</label><input type="range" id="sPulse" min="0" max="1" step="0.01"><output id="oPulse"></output></div>
+        <div class="row"><label>Drift</label><input type="range" id="sDrift" min="0" max="1" step="0.01"><output id="oDrift"></output></div>
+        <div class="row"><label>Morph</label><input type="range" id="sMorph" min="0" max="1" step="0.01"><output id="oMorph"></output></div>
+        <div class="row"><label>Camera</label><input type="range" id="sCam" min="0" max="1" step="0.01"><output id="oCam"></output></div>
+        <div class="row"><label>Palette</label><input type="range" id="sPalT" min="0" max="3" step="1"><output id="oPalT"></output></div>
+        <div class="row"><label>Trail</label><input type="range" id="sTrail" min="0.5" max="0.995" step="0.005"><output id="oTrail"></output></div>
+        <div class="note">Turns rotates each transform's linear part, pulse breathes its scale,
+        drift slides its origin, morph swings the variation weights and camera sways the view.
+        Every channel runs a whole number of cycles per loop, so at the end of one loop the flame
+        is exactly back where it started and a recorded clip repeats seamlessly.</div>
+        <div class="note">Animating re-accumulates every frame against a decaying history &mdash; trail
+        is how much survives each frame. Stopping bakes what you see into the flame and the still
+        image's progressive refinement resumes.</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Screensaver</summary>
+      <div class="sect">
+        <label class="chk"><input type="checkbox" id="kSaverAuto"><span>Enter automatically when idle</span></label>
+        <div class="row"><label>Idle after</label><input type="range" id="sIdle" min="10" max="600" step="5"><output id="oIdle"></output></div>
+        <div class="row"><label>New flame</label><input type="range" id="sInterval" min="15" max="600" step="5"><output id="oInterval"></output></div>
+        <div class="row"><label>Cross-fade</label><input type="range" id="sFade" min="0.5" max="10" step="0.1"><output id="oFade"></output></div>
+        <div class="note">The screensaver hides every control and runs the Animation settings above, replacing the flame every so often with a cross-fade rather than a cut.</div>
+        <label class="chk"><input type="checkbox" id="kSaverMut"><span>Mutate rather than fully randomize</span></label>
+        <label class="chk"><input type="checkbox" id="kSaverKeep"><span>Keep the screensaver's flame when it exits</span></label>
+        <div class="note">With that off, the screensaver is a viewer rather than an editor: it cycles through mutations while it runs and hands your own flame back untouched when you leave it. Automatic entry is off by default for the same reason.</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Quality &amp; performance</summary>
+      <div class="sect">
+        <div class="row"><label>Renderer</label>
+          <select id="selRend"><option value="cpu">CPU (stable)</option><option value="auto">GPU 4K (experimental)</option></select>
+          <output id="oRend"></output></div>
+        <div class="note" id="rendNote"></div>
+        <div class="row"><label>Resolution</label><input type="range" id="sScale" min="0.25" max="1" step="0.05"><output id="oScale"></output></div>
+        <label class="chk"><input type="checkbox" id="kSS"><span>2&#215; supersample (sharper, 4&#215; the memory)</span></label>
+        <label class="chk"><input type="checkbox" id="kAdapt"><span>Adapt sample budget to hold 30fps</span></label>
+        <div class="row"><label>Budget</label><input type="range" id="sBudget" min="20" max="3000" step="10"><output id="oBudget"></output></div>
+        <div class="note">Budget is thousands of points per frame. The histogram is never cleared unless a parameter changes, so the image keeps refining for as long as you leave it.</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Export &amp; save</summary>
+      <div class="sect">
+        <div class="row"><label>PNG size</label>
+          <select id="selMult"><option value="1">1&#215; screen</option><option value="2">2&#215;</option><option value="4">4&#215;</option></select>
+          <output id="oMult"></output></div>
+        <div class="btnrow g2"><button id="bPng" class="pri">Save PNG &nbsp;P</button><button id="bCopyJson">Copy JSON</button></div>
+        <textarea id="json" spellcheck="false" placeholder="Flame parameters as JSON"></textarea>
+        <div class="btnrow g3" style="margin-top:6px">
+          <button id="bDump">Export</button>
+          <button id="bLoad">Import</button>
+          <button id="bDefault">Default</button>
+        </div>
+        <label class="chk"><input type="checkbox" id="kStore"><span>Remember flame and settings in this browser</span></label>
+      </div>
+    </details>
+
+    <details>
+      <summary>Keys</summary>
+      <div class="sect note" style="line-height:1.7">
+        <b>space</b> pause/resume &nbsp; <b>R</b> randomize &nbsp; <b>M</b> mutate<br>
+        <b>A</b> animate &nbsp; <b>S</b> screensaver &nbsp; <b>F</b> fullscreen &nbsp; <b>H</b> hide UI &nbsp; <b>P</b> save PNG<br>
+        <b>Ctrl+Z / Ctrl+Y</b> undo, redo &nbsp; <b>1&hellip;6</b> select transform<br>
+        On the canvas: drag a corner handle to set that basis vector, drag inside
+        the triangle to translate, <b>shift</b>+corner to rotate rigidly,
+        <b>alt</b>+corner to scale uniformly.
+      </div>
+    </details>
+
+  </div>
+</div>
+
+<script>
+"use strict";
+window.addEventListener('error', function(e){
+  var el = document.getElementById('err');
+  if(!el) return;
+  el.style.display = 'block';
+  el.textContent = 'Error: ' + (e.message || e) + '\n' + (e.filename||'') + ':' + (e.lineno||'');
+});
+(function(){
+
+/* =====================================================================
+   FRACTAL FLAME  (Draves & Reckase)
+   An iterated function system rendered by the chaos game, with the three
+   departures from a textbook IFS that make it look like art:
+     1. non-linear variation functions applied after each affine map,
+     2. logarithmic density display,
+     3. structural colouring - a colour index carried by the point itself.
+   ===================================================================== */
+
+var TAU = Math.PI * 2, PI = Math.PI;
+var EPS = 1e-10;
+var FUSE = 20;            /* iterations discarded after every reseed */
+var BOUND = 1e6;          /* |x| or |y| past this means the orbit escaped */
+
+/* ---------------------------------------------------------------------
+   VARIATIONS - formulas from the flam3 source.
+   CONVENTION: theta = atan2(tx, ty).  x FIRST, y SECOND.  This is the
+   reverse of the usual atan2(y, x); getting it backwards still renders a
+   perfectly plausible image, just the wrong fractal.
+   --------------------------------------------------------------------- */
+var VARS = [
+  {id: 0,  name:'linear',       th:false},
+  {id: 1,  name:'sinusoidal',   th:false},
+  {id: 2,  name:'spherical',    th:false},
+  {id: 3,  name:'swirl',        th:false},
+  {id: 4,  name:'horseshoe',    th:false},
+  {id: 5,  name:'polar',        th:true },
+  {id: 6,  name:'handkerchief', th:true },
+  {id: 7,  name:'heart',        th:true },
+  {id: 8,  name:'disc',         th:true },
+  {id: 9,  name:'spiral',       th:true },
+  {id:10,  name:'hyperbolic',   th:true },
+  {id:11,  name:'diamond',      th:true },
+  {id:12,  name:'ex',           th:true },
+  {id:13,  name:'julia',        th:false},
+  {id:18,  name:'exponential',  th:false},
+  {id:19,  name:'power',        th:true },
+  {id:20,  name:'cosine',       th:false},
+  {id:27,  name:'eyefish',      th:false},
+  {id:28,  name:'bubble',       th:false},
+  {id:29,  name:'cylinder',     th:false}
+];
+var NV = VARS.length;
+var VNAME = {}, VNEEDTH = new Uint8Array(NV);
+for(var vi = 0; vi < NV; vi++){ VNAME[VARS[vi].id] = VARS[vi].name; VNEEDTH[vi] = VARS[vi].th ? 1 : 0; }
+
+/* ---------------------------------------------------------------------
+   PALETTES.  A palette is a gradient; the colour index c in [0,1] that
+   the point carries samples it.
+   --------------------------------------------------------------------- */
+var PALETTES = [
+  {name:'Ember',        s:[[0,'#120303'],[.22,'#5e1104'],[.48,'#c8410a'],[.72,'#f5a03c'],[.9,'#ffe6a8'],[1,'#fffdf2']]},
+  {name:'Blackbody',    s:[[0,'#000000'],[.25,'#570d02'],[.5,'#cf3b06'],[.7,'#f78c14'],[.86,'#ffe07a'],[1,'#e8f4ff']]},
+  {name:'Neon Reef',    s:[[0,'#04141c'],[.24,'#0a7f96'],[.46,'#25e4c8'],[.66,'#7ef0a0'],[.84,'#ff56b4'],[1,'#ffd0ec']]},
+  {name:'Aurora',       s:[[0,'#03110f'],[.24,'#0d6b52'],[.45,'#43d9a0'],[.62,'#63e2e8'],[.8,'#7b6cf0'],[1,'#e3d4ff']]},
+  {name:'Sunset Drive', s:[[0,'#15042a'],[.22,'#5c1a72'],[.44,'#c4318a'],[.64,'#ff6b57'],[.84,'#ffb45c'],[1,'#fff0c9']]},
+  {name:'Deep Sea',     s:[[0,'#01060f'],[.28,'#062d52'],[.52,'#0d6f9c'],[.74,'#3fc0c4'],[.9,'#a9e8dd'],[1,'#eefaf6']]},
+  {name:'Monochrome',   s:[[0,'#000000'],[.5,'#7a7a7a'],[1,'#ffffff']]},
+  {name:'Duotone Ink',  s:[[0,'#050a1e'],[.42,'#1d3f8f'],[.58,'#8a7a4e'],[1,'#f6ecd2']]},
+  {name:'Iridescent',   s:[[0,'#ff2d55'],[.17,'#ff9f0a'],[.34,'#ffe14d'],[.5,'#32d74b'],[.66,'#31c7d4'],[.83,'#5e5ce6'],[1,'#ff2d90']]},
+  {name:'Candy Wire',   s:[[0,'#12001f'],[.18,'#ff2fa0'],[.36,'#ffffff'],[.54,'#25f4ff'],[.72,'#ffffff'],[.88,'#ffe93d'],[1,'#12001f']]},
+  {name:'Copper Plate', s:[[0,'#100804'],[.3,'#5a2c12'],[.55,'#a9622c'],[.78,'#dda36a'],[1,'#f7e3c6']]},
+  {name:'Ultraviolet',  s:[[0,'#000000'],[.3,'#2a0057'],[.55,'#7c1cc4'],[.75,'#d64bff'],[.9,'#ff9df0'],[1,'#ffffff']]},
+  {name:'Forest Floor', s:[[0,'#080d05'],[.28,'#1e3a12'],[.5,'#4f7524'],[.7,'#a2a534'],[.88,'#dfae4c'],[1,'#f6e2a8']]},
+  {name:'Ice Nine',     s:[[0,'#f4fbff'],[.28,'#9fd8f2'],[.55,'#3d84c6'],[.8,'#123a72'],[1,'#030a1a']]},
+  {name:'Magma',        s:[[0,'#000004'],[.25,'#3b0f70'],[.5,'#8c2981'],[.72,'#de4968'],[.88,'#fe9f6d'],[1,'#fcfdbf']]}
+];
+
+function hex2rgb(h){
+  return [parseInt(h.substr(1,2),16)/255, parseInt(h.substr(3,2),16)/255, parseInt(h.substr(5,2),16)/255];
+}
+function rgb2hex(c){
+  function q(v){ var n = Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16); return n.length < 2 ? '0'+n : n; }
+  return '#' + q(c[0]) + q(c[1]) + q(c[2]);
+}
+function paletteStops(i){
+  var out = [], s = PALETTES[i].s, k;
+  for(k = 0; k < s.length; k++) out.push({p:s[k][0], c:hex2rgb(s[k][1])});
+  return out;
+}
+
+/* ---------------------------------------------------------------------
+   MODEL
+   --------------------------------------------------------------------- */
+function zeroVars(){ var v = [], k; for(k = 0; k < NV; k++) v.push(0); return v; }
+function varsFrom(o){
+  var v = zeroVars(), k;
+  for(k in o){ var idx = varIndexById(+k); if(idx >= 0) v[idx] = o[k]; }
+  return v;
+}
+function varIndexById(id){ var k; for(k = 0; k < NV; k++) if(VARS[k].id === id) return k; return -1; }
+
+function mkXform(co, vobj, weight, color){
+  return {enabled:true, weight:weight, color:color, co:co.slice(), v:varsFrom(vobj)};
+}
+
+function defaultFlame(){
+  return {
+    xforms: [
+      mkXform([ 0.56,-0.34, 0.28, 0.34, 0.56, 0.12], {0:0.35, 2:0.65}, 1.00, 0.02),
+      mkXform([-0.62, 0.42,-0.36,-0.42,-0.62, 0.18], {0:0.40, 3:0.60}, 0.80, 0.46),
+      mkXform([ 0.44, 0.66, 0.05,-0.66, 0.44,-0.42], {0:0.25, 1:0.25, 2:0.50}, 0.62, 0.92)
+    ],
+    finalEnabled: false,
+    final: mkXform([1,0,0,0,1,0], {0:1}, 1, 0.5),
+    palIndex: 0,
+    palStops: paletteStops(0),
+    palOffset: 0,
+    palReverse: false,
+    background: [0.01, 0.012, 0.02],
+    transparentBg: false,
+    gamma: 2.2,
+    brightness: 1.6,
+    vibrancy: 0.72,
+    sparse: 1.2,
+    view: {cx:0, cy:0, zoom:0.42, rot:0}
+  };
+}
+
+var flame = defaultFlame();
+
+/* ---------------------------------------------------------------------
+   CLASSIC IFS PRESETS
+   Textbook iterated function systems: linear variation only, so these are
+   plain affine attractors rather than flames.  They are the quickest way
+   to see what the six affine numbers and the on-canvas triangles actually
+   do - and the last entry shows what happens the moment a non-linear
+   variation is mixed back in.
+   --------------------------------------------------------------------- */
+var K3 = 1/3, KS = 0.288675;      /* 1/3, and sin(60 deg)/3 */
+var PRESETS = [
+  {name:'Sierpinski triangle', pal:6, gamma:1.00, bright:3.2, x:[
+    {co:[0.5, 0, 0,     0, 0.5, 0    ], w:1, c:0.02},
+    {co:[0.5, 0, 0.5,   0, 0.5, 0    ], w:1, c:0.50},
+    {co:[0.5, 0, 0.25,  0, 0.5, 0.433], w:1, c:0.95}]},
+
+  {name:'Barnsley fern', pal:12, gamma:1.05, bright:3.0, x:[
+    {co:[ 0,    0,    0,  0,    0.16, 0   ], w:0.01, c:0.04},
+    {co:[ 0.85, 0.04, 0, -0.04, 0.85, 1.60], w:0.85, c:0.38},
+    {co:[ 0.20,-0.26, 0,  0.23, 0.22, 1.60], w:0.07, c:0.72},
+    {co:[-0.15, 0.28, 0,  0.26, 0.24, 0.44], w:0.07, c:0.96}]},
+
+  {name:'Heighway dragon', pal:2, gamma:1.05, bright:3.0, x:[
+    {co:[ 0.5, -0.5, 0,  0.5,  0.5, 0], w:1, c:0.10},
+    {co:[-0.5,  0.5, 1, -0.5, -0.5, 0], w:1, c:0.85}]},
+
+  {name:'Koch curve', pal:13, gamma:1.05, bright:3.2, x:[
+    {co:[K3,    0,   0,     0,   K3,   0 ], w:1, c:0.05},
+    {co:[K3/2, -KS,  K3,    KS,  K3/2, 0 ], w:1, c:0.35},
+    {co:[K3/2,  KS,  0.5,  -KS,  K3/2, KS], w:1, c:0.65},
+    {co:[K3,    0,   2*K3,  0,   K3,   0 ], w:1, c:0.95}]},
+
+  {name:'Levy C curve', pal:5, gamma:1.05, bright:3.0, x:[
+    {co:[0.5, -0.5, 0,   0.5, 0.5, 0  ], w:1, c:0.15},
+    {co:[0.5,  0.5, 0.5,-0.5, 0.5, 0.5], w:1, c:0.85}]},
+
+  {name:'Sierpinski, flamed', pal:0, gamma:2.2, bright:1.7, vib:0.80, sparse:1.2, x:[
+    {co:[0.5, 0, 0,     0, 0.5, 0    ], w:1, c:0.02, v:{0:0.75, 2:0.25}},
+    {co:[0.5, 0, 0.5,   0, 0.5, 0    ], w:1, c:0.50, v:{0:0.70, 3:0.30}},
+    {co:[0.5, 0, 0.25,  0, 0.5, 0.433], w:1, c:0.95, v:{0:0.80, 1:0.20}}]}
+];
+
+function applyPreset(i){
+  var pr = PRESETS[i], k;
+  if(!pr) return;
+  commit();
+  var f = defaultFlame();
+  f.xforms = [];
+  for(k = 0; k < pr.x.length; k++){
+    var d = pr.x[k];
+    f.xforms.push(mkXform(d.co, d.v || {0:1}, d.w, d.c));
+  }
+  f.finalEnabled = false;
+  /* a plain IFS has near-uniform density, which the flame defaults render
+     as a dim smear; flattening gamma and pushing exposure gives the crisp
+     textbook look instead */
+  f.gamma = pr.gamma;
+  f.brightness = pr.bright;
+  f.vibrancy = pr.vib === undefined ? 1 : pr.vib;
+  f.sparse = pr.sparse === undefined ? 0 : pr.sparse;
+  f.palIndex = pr.pal;
+  f.palStops = paletteStops(pr.pal);
+  f.palOffset = 0;
+  f.palReverse = false;
+  flame = f;
+  selX = 0; selStop = 0;
+  compile();
+  autoFit();
+  syncUI();
+  buildPaletteEditor();
+  commit();
+  saveSoon();
+  toast(pr.name);
+}
+
+
+var settings = {
+  renderer: 'cpu', renderScale: 0.7, ss: 1, adaptive: true, budget: 240,
+  saverAuto: false, idle: 300, interval: 90, fade: 3.0, saverMutate: true, saverKeep: false,
+  store: true, pngMult: 2
+};
+
+/* Motion channels.  Each is a whole number of cycles per loop, so the
+   flame returns exactly to its starting pose at the end of every loop. */
+var anim = {
+  on: false, loop: 24, rotate: 1, pulse: 0.25, drift: 0.18,
+  morph: 0.30, camera: 0.20, palette: 0, trail: 0.975
+};
+
+/* ---------------------------------------------------------------------
+   DOM
+   --------------------------------------------------------------------- */
+function $(id){ return document.getElementById(id); }
+var cvF = $('flame'), ctxF = cvF.getContext('2d', {alpha:false});
+var cvO = $('overlay'), ctxO = cvO.getContext('2d');
+
+var outW = 0, outH = 0, histW = 0, histH = 0, SS = 1, DPR = 1, cssW = 0, cssH = 0;
+var hist = null, hr = null, hg = null, hb = null, hc = null;
+var imgData = null, imgBuf = null;
+var dmax = 0, totalSamples = 0, accWeight = 1;
+var palR = new Float32Array(256), palG = new Float32Array(256), palB = new Float32Array(256);
+
+/* compiled hot-loop state */
+var nxf = 0, ca = null, cdf = null, xcol = null;
+var vStart = null, vId = null, vW = null, needTh = null;
+var finalOn = false, fCo = null, fVs = 0, fVe = 0, fNeedTh = 0;
+var stX = 0, stY = 0, stC = 0, stFuse = FUSE;
+
+/* view cache */
+var vcx = 0, vcy = 0, vcos = 1, vsin = 0, vscale = 1, vhw = 0, vhh = 0, vZoom = 1;
+
+/* run state */
+var paused = false, saver = false, hideUI = false;
+var animOn = false;
+var fadeFrom = null, fadeT = 0, fadeDur = 0;
+var lastNewFlame = 0, lastInput = 0;
+var budgetPts = settings.budget * 1000;
+
+/* ---------------------------------------------------------------------
+   PALETTE SAMPLING
+   --------------------------------------------------------------------- */
+function sortedStops(){
+  var s = flame.palStops.slice();
+  s.sort(function(a,b){ return a.p - b.p; });
+  if(!s.length) s = [{p:0,c:[0,0,0]},{p:1,c:[1,1,1]}];
+  return s;
+}
+function sampleStops(s, t){
+  var n = s.length, i;
+  if(t <= s[0].p) return s[0].c;
+  if(t >= s[n-1].p) return s[n-1].c;
+  i = 0;
+  while(i < n - 2 && t > s[i+1].p) i++;
+  var a = s[i], b = s[i+1];
+  var dp = b.p - a.p;
+  var f = dp < 1e-9 ? 0 : (t - a.p) / dp;
+  return [a.c[0]+(b.c[0]-a.c[0])*f, a.c[1]+(b.c[1]-a.c[1])*f, a.c[2]+(b.c[2]-a.c[2])*f];
+}
+function buildPaletteLUT(){
+  var s = sortedStops(), i, t, c;
+  for(i = 0; i < 256; i++){
+    t = i / 255 + flame.palOffset + palAnimOff;
+    t -= Math.floor(t);
+    if(flame.palReverse) t = 1 - t;
+    c = sampleStops(s, t);
+    palR[i] = c[0]; palG[i] = c[1]; palB[i] = c[2];
+  }
+  /* keep the GPU's copy in step here rather than at each call site -
+     a preset or a compile() rebuilds the LUT without going through
+     recolour(), and a stale palette texture is silently wrong */
+  if(gpuOn && glReady && glTex.pal) gpuUploadPalette();
+}
+
+/* ---------------------------------------------------------------------
+   COMPILE  -  flatten the flame into typed arrays for the hot loop
+   --------------------------------------------------------------------- */
+function activeXforms(){
+  var a = [], i;
+  for(i = 0; i < flame.xforms.length; i++){
+    var x = flame.xforms[i];
+    if(x.enabled && x.weight > 0) a.push(x);
+  }
+  if(!a.length) a = flame.xforms.slice(0, 1);
+  return a;
+}
+
+function packVars(list){
+  var ids = [], ws = [], starts = [0], nth = [], slots = [], i, k;
+  for(i = 0; i < list.length; i++){
+    var v = list[i].v, any = false, need = 0;
+    for(k = 0; k < NV; k++){
+      if(v[k] !== 0){
+        ids.push(VARS[k].id); ws.push(v[k]); slots.push(k); any = true;
+        if(VNEEDTH[k]) need = 1;
+      }
+    }
+    if(!any){ ids.push(0); ws.push(1); slots.push(0); }   /* an all-zero xform would collapse to a point */
+    starts.push(ids.length);
+    nth.push(need);
+  }
+  return {ids:ids, ws:ws, starts:starts, nth:nth, slots:slots};
+}
+
+function compile(){
+  var xs = activeXforms(), i;
+  nxf = xs.length;
+  ca = new Float64Array(nxf * 6);
+  xcol = new Float64Array(nxf);
+  cdf = new Float64Array(nxf);
+
+  var tot = 0;
+  for(i = 0; i < nxf; i++) tot += xs[i].weight;
+  if(tot <= 0) tot = 1;
+  var run = 0;
+  for(i = 0; i < nxf; i++){
+    run += xs[i].weight / tot;
+    cdf[i] = run;
+    xcol[i] = xs[i].color;
+  }
+  cdf[nxf-1] = 1;
+
+  var all = xs.slice();
+  finalOn = !!flame.finalEnabled;
+  if(finalOn) all.push(flame.final);
+  var p = packVars(all);
+  vId = new Int32Array(p.ids);
+  vW = new Float64Array(p.ws);
+  vStart = new Int32Array(p.starts);
+  needTh = new Uint8Array(p.nth);
+  vSlot = new Int32Array(p.slots);
+  vW0 = new Float64Array(vW);        /* the weights before any morph */
+  if(finalOn){
+    fVs = p.starts[nxf]; fVe = p.starts[nxf+1]; fNeedTh = p.nth[nxf];
+    fCo = new Float64Array(flame.final.co);
+  }
+  compiledXs = xs;
+  animSlot = [];
+  for(i = 0; i < flame.xforms.length; i++) animSlot[i] = -1;
+  for(i = 0; i < nxf; i++){
+    var fi = flame.xforms.indexOf(xs[i]);
+    if(fi >= 0) animSlot[fi] = i;
+  }
+  if(animOn) applyAnimation(); else applyCoefs();
+  buildPaletteLUT();
+}
+var compiledXs = [], animSlot = [];
+
+/* ---------------------------------------------------------------------
+   ANIMATION
+   One phase u in [0,1) drives every channel, and each channel runs a
+   whole number of cycles across that phase.  At u = 1 the pose is
+   therefore identical to u = 0, which is what makes a clip exactly one
+   loop long repeat without a seam.
+
+   The animated coefficients are recomputed from the stored ones every
+   frame rather than nudged cumulatively, so the motion cannot drift or
+   accumulate rounding no matter how long it runs.
+   --------------------------------------------------------------------- */
+var animPhase = 0;
+var ROTM = [1, -1, 2, -2, 3, -3];      /* turn multipliers, all integers */
+var HARM = [1, 2, 1, 3, 2, 1];         /* cycle counts for the wobbles */
+var viewZoomMul = 1, viewRotAdd = 0, palAnimOff = 0;
+var vW0 = null, vSlot = null;
+
+/* the flame at rest: coefficients straight through, no motion applied */
+function applyCoefs(){
+  var i, o, x;
+  for(i = 0; i < nxf; i++){
+    x = compiledXs[i]; o = i * 6;
+    ca[o]   = x.co[0]; ca[o+1] = x.co[1]; ca[o+2] = x.co[2];
+    ca[o+3] = x.co[3]; ca[o+4] = x.co[4]; ca[o+5] = x.co[5];
+  }
+  if(finalOn && fCo) for(i = 0; i < 6; i++) fCo[i] = flame.final.co[i];
+  if(vW0) for(i = 0; i < vW.length; i++) vW[i] = vW0[i];
+  viewZoomMul = 1; viewRotAdd = 0; palAnimOff = 0;
+}
+
+function animLinear(co, out, off, turns, scale){
+  var ph = TAU * turns, cs = Math.cos(ph) * scale, sn = Math.sin(ph) * scale;
+  out[off]   = cs*co[0] - sn*co[3];
+  out[off+1] = cs*co[1] - sn*co[4];
+  out[off+3] = sn*co[0] + cs*co[3];
+  out[off+4] = sn*co[1] + cs*co[4];
+}
+
+function applyAnimation(){
+  var u = animPhase, i, k, x, o, m, h;
+
+  for(i = 0; i < nxf; i++){
+    x = compiledXs[i]; o = i * 6; m = i % 6;
+    h = 1 + anim.pulse * 0.30 * Math.sin(TAU * HARM[m] * u + i * 1.7);
+    animLinear(x.co, ca, o, anim.rotate * ROTM[m] * u, h);
+    ca[o+2] = x.co[2] + anim.drift * 0.30 * Math.sin(TAU * HARM[(i+1) % 6] * u + i * 2.3);
+    ca[o+5] = x.co[5] + anim.drift * 0.30 * Math.cos(TAU * HARM[(i+2) % 6] * u + i * 1.1);
+  }
+  if(finalOn && fCo){
+    m = nxf % 6;
+    animLinear(flame.final.co, fCo, 0, anim.rotate * ROTM[m] * u * 0.5, 1);
+    fCo[2] = flame.final.co[2];
+    fCo[5] = flame.final.co[5];
+  }
+
+  if(vW0){
+    if(anim.morph > 0){
+      for(k = 0; k < vW.length; k++){
+        vW[k] = vW0[k] * (1 + anim.morph * 0.55 * Math.sin(TAU * (1 + (k % 3)) * u + k * 0.9));
+      }
+    } else {
+      for(k = 0; k < vW.length; k++) vW[k] = vW0[k];
+    }
+  }
+
+  viewZoomMul = 1 + anim.camera * 0.16 * Math.sin(TAU * u);
+  viewRotAdd  = anim.camera * 0.22 * Math.sin(TAU * u + 1.0);
+  updateView();
+
+  if(anim.palette > 0){
+    /* wrapped, so the value itself returns to 0 at the end of the loop
+       rather than only being equivalent to it after the LUT's own mod */
+    palAnimOff = (anim.palette * u) % 1;
+    buildPaletteLUT();
+  } else if(palAnimOff !== 0){
+    palAnimOff = 0;
+    buildPaletteLUT();
+  }
+}
+
+/* ---------------------------------------------------------------------
+   THE VARIATIONS.  theta = atan2(tx, ty): x FIRST, y SECOND.
+   --------------------------------------------------------------------- */
+var oX = 0, oY = 0;
+function variate(s, e, nth, tx, ty){
+  var r2 = tx*tx + ty*ty;
+  var r = Math.sqrt(r2);
+  var th = nth ? Math.atan2(tx, ty) : 0;
+  var vx = 0, vy = 0, k, w;
+  for(k = s; k < e; k++){
+    w = vW[k];
+    switch(vId[k]){
+      case 0: vx += w*tx; vy += w*ty; break;
+      case 1: vx += w*Math.sin(tx); vy += w*Math.sin(ty); break;
+      case 2: { var q2 = w/(r2+EPS); vx += q2*tx; vy += q2*ty; break; }
+      case 3: { var s3 = Math.sin(r2), c3 = Math.cos(r2);
+                vx += w*(tx*s3 - ty*c3); vy += w*(tx*c3 + ty*s3); break; }
+      case 4: { var q4 = w/(r+EPS); vx += q4*(tx-ty)*(tx+ty); vy += q4*2*tx*ty; break; }
+      case 5: vx += w*th/PI; vy += w*(r - 1); break;
+      case 6: vx += w*r*Math.sin(th+r); vy += w*r*Math.cos(th-r); break;
+      case 7: { var a7 = r*th; vx += w*r*Math.sin(a7); vy -= w*r*Math.cos(a7); break; }
+      case 8: { var t8 = w*th/PI; vx += t8*Math.sin(PI*r); vy += t8*Math.cos(PI*r); break; }
+      case 9: { var q9 = w/(r+EPS);
+                vx += q9*(Math.cos(th) + Math.sin(r)); vy += q9*(Math.sin(th) - Math.cos(r)); break; }
+      case 10:{ var qa = w/(r+EPS); vx += qa*Math.sin(th); vy += w*r*Math.cos(th); break; }
+      case 11: vx += w*Math.sin(th)*Math.cos(r); vy += w*Math.cos(th)*Math.sin(r); break;
+      case 12:{ var n0 = Math.sin(th+r), n1 = Math.cos(th-r);
+                var m0 = n0*n0*n0*r, m1 = n1*n1*n1*r;
+                vx += w*(m0+m1); vy += w*(m0-m1); break; }
+      case 13:{ var rr = Math.sqrt(r);
+                var t13 = Math.atan2(tx, ty) * 0.5;
+                if(Math.random() < 0.5) t13 += PI;
+                vx += w*rr*Math.cos(t13); vy += w*rr*Math.sin(t13); break; }
+      case 18:{ var ex = w*Math.exp(tx - 1);
+                vx += ex*Math.cos(PI*ty); vy += ex*Math.sin(PI*ty); break; }
+      case 19:{ var pw = w*Math.pow(r + EPS, Math.sin(th));
+                vx += pw*Math.cos(th); vy += pw*Math.sin(th); break; }
+      case 20: vx += w*Math.cos(PI*tx)*Math.cosh(ty); vy -= w*Math.sin(PI*tx)*Math.sinh(ty); break;
+      case 27:{ var k27 = w*2/(r+1); vx += k27*tx; vy += k27*ty; break; }
+      case 28:{ var k28 = w*4/(r2+4); vx += k28*tx; vy += k28*ty; break; }
+      case 29: vx += w*Math.sin(tx); vy += w*ty; break;
+    }
+  }
+  oX = vx; oY = vy;
+}
+
+/* ---------------------------------------------------------------------
+   THE CHAOS GAME
+   --------------------------------------------------------------------- */
+function reseedPoint(){
+  stX = Math.random()*2 - 1;
+  stY = Math.random()*2 - 1;
+  stC = Math.random();
+  stFuse = FUSE;
+}
+
+function iterate(n){
+  var x = stX, y = stY, c = stC, fuse = stFuse;
+  var nlast = nxf - 1, HW = histW, HH = histH, w = accWeight;
+  var i, j, o, tx, ty, rv, ci, idx, d, qx, qy, ddx, ddy, sx, sy;
+  var H = hist, R = hr, G = hg, B = hb, C = hc;
+  var pr = palR, pg = palG, pb = palB;
+  var dm = dmax, hits = 0;
+
+  for(i = 0; i < n; i++){
+    /* 1. pick a transform, weighted by its probability */
+    rv = Math.random();
+    j = 0;
+    while(j < nlast && rv >= cdf[j]) j++;
+
+    /* 2. its affine map */
+    o = j * 6;
+    tx = ca[o]*x + ca[o+1]*y + ca[o+2];
+    ty = ca[o+3]*x + ca[o+4]*y + ca[o+5];
+
+    /* 3. blend its variations */
+    variate(vStart[j], vStart[j+1], needTh[j], tx, ty);
+    x = oX; y = oY;
+
+    /* 4. blend the colour index toward this transform's own colour */
+    c = (c + xcol[j]) * 0.5;
+
+    /* Robustness: spherical at the origin, spiral and hyperbolic all
+       diverge.  A single NaN would poison every pixel it touches, so the
+       point is reseeded and re-fused instead. */
+    if(!(x > -BOUND && x < BOUND && y > -BOUND && y < BOUND)){
+      x = Math.random()*2 - 1; y = Math.random()*2 - 1;
+      c = Math.random(); fuse = FUSE;
+      continue;
+    }
+
+    /* FUSE: the orbit has to reach the attractor before anything is
+       plotted, or the approach leaves stray specks across the image. */
+    if(fuse > 0){ fuse--; continue; }
+
+    /* 5. the final transform is for plotting only - it must not feed
+       back into the iteration state. */
+    qx = x; qy = y;
+    if(finalOn){
+      tx = fCo[0]*x + fCo[1]*y + fCo[2];
+      ty = fCo[3]*x + fCo[4]*y + fCo[5];
+      variate(fVs, fVe, fNeedTh, tx, ty);
+      qx = oX; qy = oY;
+      if(!(qx > -BOUND && qx < BOUND && qy > -BOUND && qy < BOUND)) continue;
+    }
+
+    /* 6. plot into the histogram */
+    ddx = qx - vcx; ddy = qy - vcy;
+    sx = vhw + (ddx*vcos - ddy*vsin) * vscale;
+    sy = vhh - (ddx*vsin + ddy*vcos) * vscale;
+    if(sx >= 0 && sy >= 0 && sx < HW && sy < HH){
+      idx = (sy|0) * HW + (sx|0);
+      d = H[idx] + w; H[idx] = d;
+      ci = c <= 0 ? 0 : (c >= 1 ? 255 : (c*256)|0);
+      R[idx] += pr[ci]*w; G[idx] += pg[ci]*w; B[idx] += pb[ci]*w;
+      C[idx] += c*w;
+      if(d > dm) dm = d;
+      hits++;
+    }
+  }
+  stX = x; stY = y; stC = c; stFuse = fuse;
+  dmax = dm;
+  totalSamples += n;
+  return hits;
+}
+
+/* ---------------------------------------------------------------------
+   BUFFERS
+   --------------------------------------------------------------------- */
+var MAXCELLS = 4200000;
+/* An animated frame gets one frame's worth of samples, not minutes' worth,
+   so it is always sparser than a still.  Rendering animation at ~70% of the
+   linear resolution halves the pixel count and doubles the samples each one
+   receives; the canvas is scaled back up smoothly and flames are soft enough
+   that the trade is invisible from across a room. */
+var ANIM_SCALE = 0.72;
+
+function allocate(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  cssW = Math.max(1, window.innerWidth);
+  cssH = Math.max(1, window.innerHeight);
+
+  /* the canvas reference is needed even when WebGL is never initialised */
+  if(!glc) glc = $('glflame');
+  gpuOn = (settings.renderer !== 'cpu') && gpuInit();
+
+  /* The GPU has no reason to drop resolution while animating - that penalty
+     exists because a CPU frame can only afford a quarter of a million
+     samples.  It also lifts the cell cap: the accumulation lives in VRAM. */
+  var rs = settings.renderScale * ((animOn && !gpuOn) ? ANIM_SCALE : 1);
+  var maxc = gpuOn ? GPU_MAXCELLS : MAXCELLS;
+  var w0 = cssW * DPR * rs;
+  var h0 = cssH * DPR * rs;
+  SS = settings.ss;
+  var k = Math.sqrt(maxc / Math.max(1, w0 * h0 * SS * SS));
+  if(k < 1){ w0 *= k; h0 *= k; }
+
+  outW = Math.max(16, Math.round(w0));
+  outH = Math.max(16, Math.round(h0));
+  histW = outW * SS;
+  histH = outH * SS;
+
+  cvO.width = Math.round(cssW * DPR); cvO.height = Math.round(cssH * DPR);
+  ctxO.setTransform(DPR, 0, 0, DPR, 0, 0);
+  fadeFrom = null;
+
+  if(gpuOn){
+    cvF.style.display = 'none';
+    glc.style.display = 'block';
+    hist = null; hr = null; hg = null; hb = null; hc = null;
+    imgData = null; imgBuf = null;
+    updateView();
+    clearHistogram();
+    gpuAlloc();
+    gpuUploadPalette();
+  } else {
+    glc.style.display = 'none';
+    cvF.style.display = 'block';
+    cvF.width = outW; cvF.height = outH;
+    var cells = histW * histH;
+    hist = new Float32Array(cells);
+    hr = new Float32Array(cells);
+    hg = new Float32Array(cells);
+    hb = new Float32Array(cells);
+    hc = new Float32Array(cells);   /* mean colour index, so a palette change
+                                       can recolour instead of starting over */
+    imgData = ctxF.createImageData(outW, outH);
+    imgBuf = imgData.data;
+    updateView();
+    clearHistogram();
+  }
+  $('stRes').textContent = histW + '×' + histH + (gpuOn ? '  GPU' : '  CPU');
+  var rn = $('rendNote');
+  if(rn) rn.textContent = gpuOn
+    ? 'GPU: ' + (GP*GP/1e6).toFixed(1) + 'M points per round, full resolution while animating. ' +
+      'EXPERIMENTAL - accumulation stops after the buffer is re-allocated, so avoid ' +
+      'resizing the window, changing resolution or toggling animation; reselect the ' +
+      'GPU option to restart it.'
+    : ('Running on the CPU' + (gpuWhy ? ' (' + gpuWhy + ')' : '') +
+       '. Animation drops to ' + Math.round(ANIM_SCALE*100) + '% resolution to keep its sample density up.');
+}
+
+function activeCanvas(){ return gpuOn ? glc : cvF; }
+
+function clearHistogram(){
+  dmax = 0; totalSamples = 0; accWeight = 1;
+  reseedPoint();
+  if(!hist) return;                      /* GPU mode keeps no CPU buffers */
+  hist.fill(0); hr.fill(0); hg.fill(0); hb.fill(0); hc.fill(0);
+}
+
+function updateView(){
+  var v = flame.view;
+  /* the camera channel sways zoom and rotation without touching the
+     stored view, so stopping the animation leaves it as the user set it */
+  vZoom = Math.max(0.0005, v.zoom * viewZoomMul);
+  var rot = v.rot + viewRotAdd;
+  vcx = v.cx; vcy = v.cy;
+  vcos = Math.cos(rot); vsin = Math.sin(rot);
+  vhw = histW / 2; vhh = histH / 2;
+  vscale = vZoom * Math.min(histW, histH) / 2;
+}
+
+function worldToScreen(x, y){
+  var v = flame.view, s = vZoom * Math.min(cssW, cssH) / 2;
+  var dx = x - v.cx, dy = y - v.cy;
+  return [cssW/2 + (dx*vcos - dy*vsin)*s, cssH/2 - (dx*vsin + dy*vcos)*s];
+}
+function screenToWorld(sx, sy){
+  var v = flame.view, s = vZoom * Math.min(cssW, cssH) / 2;
+  var ax = (sx - cssW/2) / s, ay = -(sy - cssH/2) / s;
+  return [v.cx + ax*vcos + ay*vsin, v.cy - ax*vsin + ay*vcos];
+}
+
+/* ---------------------------------------------------------------------
+   TONE MAPPING  -  logarithmic density, then gamma, then vibrancy.
+   Linear density gives a dim smear with a blown-out core; the log curve
+   is what makes the faint filaments visible at all.
+   --------------------------------------------------------------------- */
+var GN = 2048, gpow = new Float32Array(GN + 1), gpowFor = -1;
+function buildGamma(){
+  var ig = 1 / flame.gamma, i;
+  for(i = 0; i <= GN; i++) gpow[i] = Math.pow(i / GN, ig);
+  gpowFor = flame.gamma;
+}
+function gp(v){
+  if(v <= 0) return 0;
+  if(v >= 1) return 1;
+  var t = v * GN, i = t | 0, f = t - i;
+  return gpow[i] + (gpow[i+1] - gpow[i]) * f;
+}
+
+function toneMap(){
+  if(gpowFor !== flame.gamma) buildGamma();
+  var w = outW, h = outH, HW = histW, ss = SS;
+  var img = imgBuf, H = hist, R = hr, G = hg, B = hb;
+  var bg = flame.background;
+  var b0 = bg[0]*255, b1 = bg[1]*255, b2 = bg[2]*255;
+  var vib = flame.vibrancy, ivib = 1 - vib, br = flame.brightness;
+  var cut = flame.sparse, invW = cut > 0 ? 1/accWeight : 0;
+
+  /* dmax is tracked incrementally while plotting, which is exact for
+     ss = 1.  With supersampling the display value is a sum of ss*ss
+     cells, so the peak of those sums has to be found first. */
+  var dm = dmax, x, y, p = 0, i, d, sr, sg, sb, a, ga, inv, cr, cg, cb, rr, gg, bb;
+  if(ss > 1){
+    dm = 0;
+    for(y = 0; y < h; y++){
+      var rowA = (y*ss)*HW;
+      for(x = 0; x < w; x++){
+        var bx = rowA + x*ss, sum = 0, u, v2;
+        for(v2 = 0; v2 < ss; v2++){
+          var rb = bx + v2*HW;
+          for(u = 0; u < ss; u++) sum += H[rb + u];
+        }
+        if(sum > dm) dm = sum;
+      }
+    }
+  }
+  if(dm <= 0){
+    for(i = 0; i < img.length; i += 4){ img[i] = b0; img[i+1] = b1; img[i+2] = b2; img[i+3] = 255; }
+    ctxF.putImageData(imgData, 0, 0);
+    return;
+  }
+  var linv = 1 / Math.log(1 + dm);
+
+  for(y = 0; y < h; y++){
+    if(ss === 1){
+      i = y * HW;
+      for(x = 0; x < w; x++, i++, p += 4){
+        d = H[i];
+        if(d === 0){ img[p] = b0; img[p+1] = b1; img[p+2] = b2; img[p+3] = 255; continue; }
+        a = Math.log(1 + d) * linv;
+        if(cut > 0){ var dn1 = d*invW; a *= dn1/(dn1 + cut); }
+        ga = gp(a);
+        inv = 1 / d;
+        cr = R[i]*inv; cg = G[i]*inv; cb = B[i]*inv;
+        rr = (ivib*gp(cr*a) + vib*cr*ga) * br;
+        gg = (ivib*gp(cg*a) + vib*cg*ga) * br;
+        bb = (ivib*gp(cb*a) + vib*cb*ga) * br;
+        rr = b0 + rr*255; gg = b1 + gg*255; bb = b2 + bb*255;
+        img[p]   = rr > 255 ? 255 : rr;
+        img[p+1] = gg > 255 ? 255 : gg;
+        img[p+2] = bb > 255 ? 255 : bb;
+        img[p+3] = 255;
+      }
+    } else {
+      var base = (y*ss)*HW;
+      for(x = 0; x < w; x++, p += 4){
+        var bx2 = base + x*ss, uu, vv, rb2;
+        d = 0; sr = 0; sg = 0; sb = 0;
+        for(vv = 0; vv < ss; vv++){
+          rb2 = bx2 + vv*HW;
+          for(uu = 0; uu < ss; uu++){
+            var q = rb2 + uu;
+            d += H[q]; sr += R[q]; sg += G[q]; sb += B[q];
+          }
+        }
+        if(d === 0){ img[p] = b0; img[p+1] = b1; img[p+2] = b2; img[p+3] = 255; continue; }
+        a = Math.log(1 + d) * linv;
+        if(cut > 0){ var dn2 = d*invW; a *= dn2/(dn2 + cut); }
+        ga = gp(a);
+        inv = 1 / d;
+        cr = sr*inv; cg = sg*inv; cb = sb*inv;
+        rr = (ivib*gp(cr*a) + vib*cr*ga) * br;
+        gg = (ivib*gp(cg*a) + vib*cg*ga) * br;
+        bb = (ivib*gp(cb*a) + vib*cb*ga) * br;
+        rr = b0 + rr*255; gg = b1 + gg*255; bb = b2 + bb*255;
+        img[p]   = rr > 255 ? 255 : rr;
+        img[p+1] = gg > 255 ? 255 : gg;
+        img[p+2] = bb > 255 ? 255 : bb;
+        img[p+3] = 255;
+      }
+    }
+  }
+
+  /* cross-fade between the outgoing flame and the one replacing it */
+  if(fadeFrom && fadeT < 1){
+    var t = fadeT, it = 1 - t, n = img.length;
+    for(i = 0; i < n; i += 4){
+      img[i]   = img[i]  *t + fadeFrom[i]  *it;
+      img[i+1] = img[i+1]*t + fadeFrom[i+1]*it;
+      img[i+2] = img[i+2]*t + fadeFrom[i+2]*it;
+    }
+  }
+  ctxF.putImageData(imgData, 0, 0);
+}
+
+/* Tone map an arbitrary histogram into RGBA - used by the PNG exporter,
+   which renders at its own resolution and may want a transparent
+   background. */
+function toneMapTo(H, R, G, B, w, h, out, transparent){
+  if(gpowFor !== flame.gamma) buildGamma();
+  var bg = flame.background;
+  var b0 = bg[0]*255, b1 = bg[1]*255, b2 = bg[2]*255;
+  var vib = flame.vibrancy, ivib = 1 - vib, br = flame.brightness;
+  var i, n = w*h, d, dm = 0, p = 0;
+  for(i = 0; i < n; i++) if(H[i] > dm) dm = H[i];
+  if(dm <= 0) dm = 1;
+  var linv = 1 / Math.log(1 + dm);
+  for(i = 0; i < n; i++, p += 4){
+    d = H[i];
+    if(d === 0){
+      out[p] = transparent ? 0 : b0; out[p+1] = transparent ? 0 : b1;
+      out[p+2] = transparent ? 0 : b2; out[p+3] = transparent ? 0 : 255;
+      continue;
+    }
+    var a = Math.log(1 + d) * linv;
+    if(flame.sparse > 0){ a *= d/(d + flame.sparse); }
+    var ga = gp(a), inv = 1/d;
+    var cr = R[i]*inv, cg = G[i]*inv, cb = B[i]*inv;
+    var rr = (ivib*gp(cr*a) + vib*cr*ga) * br;
+    var gg = (ivib*gp(cg*a) + vib*cg*ga) * br;
+    var bb = (ivib*gp(cb*a) + vib*cb*ga) * br;
+    if(transparent){
+      /* straight alpha, un-premultiplied off the brightest channel, so the
+         PNG composites over any background the way it looks here on black */
+      var al = Math.max(rr, gg, bb);
+      if(al > 1) al = 1;
+      if(al > 1e-6){ rr /= al; gg /= al; bb /= al; }
+      out[p] = rr*255 > 255 ? 255 : rr*255;
+      out[p+1] = gg*255 > 255 ? 255 : gg*255;
+      out[p+2] = bb*255 > 255 ? 255 : bb*255;
+      out[p+3] = al*255;
+    } else {
+      rr = b0 + rr*255; gg = b1 + gg*255; bb = b2 + bb*255;
+      out[p] = rr > 255 ? 255 : rr;
+      out[p+1] = gg > 255 ? 255 : gg;
+      out[p+2] = bb > 255 ? 255 : bb;
+      out[p+3] = 255;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------
+   PROBING THE ATTRACTOR
+   Runs the chaos game without plotting, to (a) frame the camera and
+   (b) judge whether a randomly generated flame is worth showing.
+   --------------------------------------------------------------------- */
+var probeX = null, probeY = null;
+function probe(maxPts){
+  maxPts = maxPts || 20000;
+  if(!probeX || probeX.length < maxPts){ probeX = new Float64Array(maxPts); probeY = new Float64Array(maxPts); }
+  var x = Math.random()*2-1, y = Math.random()*2-1, fuse = FUSE;
+  var m = 0, i, j, o, tx, ty, rv, qx, qy, lim = maxPts * 6;
+  for(i = 0; i < lim && m < maxPts; i++){
+    rv = Math.random(); j = 0;
+    while(j < nxf-1 && rv >= cdf[j]) j++;
+    o = j*6;
+    tx = ca[o]*x + ca[o+1]*y + ca[o+2];
+    ty = ca[o+3]*x + ca[o+4]*y + ca[o+5];
+    variate(vStart[j], vStart[j+1], needTh[j], tx, ty);
+    x = oX; y = oY;
+    if(!(x > -BOUND && x < BOUND && y > -BOUND && y < BOUND)){
+      x = Math.random()*2-1; y = Math.random()*2-1; fuse = FUSE; continue;
+    }
+    if(fuse > 0){ fuse--; continue; }
+    qx = x; qy = y;
+    if(finalOn){
+      tx = fCo[0]*x + fCo[1]*y + fCo[2];
+      ty = fCo[3]*x + fCo[4]*y + fCo[5];
+      variate(fVs, fVe, fNeedTh, tx, ty);
+      qx = oX; qy = oY;
+      if(!(qx > -BOUND && qx < BOUND && qy > -BOUND && qy < BOUND)) continue;
+    }
+    probeX[m] = qx; probeY[m] = qy; m++;
+  }
+  if(m < 200) return {n:m, ok:false, cells:0};
+
+  var sx = probeX.slice(0, m), sy = probeY.slice(0, m);
+  sx.sort(); sy.sort();
+  var lo = Math.max(0, Math.floor(m*0.004)), hi = Math.min(m-1, Math.floor(m*0.996));
+  var x0 = sx[lo], x1 = sx[hi], y0 = sy[lo], y1 = sy[hi];
+  var hx = Math.max(1e-5, (x1-x0)/2), hy = Math.max(1e-5, (y1-y0)/2);
+  var mx = (x0+x1)/2, my = (y0+y1)/2;
+
+  /* occupancy of a 64x64 grid over the robust bounds: a couple of cells
+     means the attractor collapsed, nearly all of them means featureless
+     dust, and neither is worth looking at */
+  var grid = new Uint8Array(4096), cells = 0, k, gx, gy;
+  for(k = 0; k < m; k++){
+    gx = ((probeX[k]-x0)/(x1-x0+1e-12)*64) | 0;
+    gy = ((probeY[k]-y0)/(y1-y0+1e-12)*64) | 0;
+    if(gx >= 0 && gx < 64 && gy >= 0 && gy < 64){
+      var gi = gy*64+gx;
+      if(!grid[gi]){ grid[gi] = 1; cells++; }
+    }
+  }
+  return {n:m, cells:cells, mx:mx, my:my, hx:hx, hy:hy,
+          ok: m >= maxPts*0.35 && cells >= 520 && cells <= 3850};
+}
+
+function fitTo(p){
+  if(!p || !p.hx) return false;
+  var v = flame.view;
+  /* bounds are measured in world space; the camera may be rotated, so the
+     centre is carried back through the inverse rotation */
+  var mn = Math.min(cssW, cssH);
+  var zx = (cssW / mn) / p.hx, zy = (cssH / mn) / p.hy;
+  v.zoom = Math.max(0.01, Math.min(zx, zy) * 0.80);
+  v.cx = p.mx; v.cy = p.my;
+  updateView();
+  return true;
+}
+
+function autoFit(){
+  compile();
+  var p = probe(24000);
+  if(fitTo(p)){ resetAccumulation(); return true; }
+  return false;
+}
+
+/* ---------------------------------------------------------------------
+   RANDOMIZE  -  biased hard toward parameters that give real images.
+   Uniformly random coefficients almost always give dust.
+   --------------------------------------------------------------------- */
+var VPICK_IDS = [0,0,0, 1,1, 2,2,2,2,2, 3,3,3, 4,4, 5, 6,6, 7, 8,8, 9,9, 10,
+                 11,11, 12, 13,13, 18, 19, 20, 27,27,27, 28,28, 29];
+var VPICK = [];
+(function(){ var i; for(i = 0; i < VPICK_IDS.length; i++) VPICK.push(varIndexById(VPICK_IDS[i])); })();
+
+function gauss(){
+  var u = 0, v = 0;
+  while(u === 0) u = Math.random();
+  while(v === 0) v = Math.random();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(TAU*v);
+}
+function cloneFlame(f){ return JSON.parse(JSON.stringify(f)); }
+
+/* The contraction factor is the single thing that decides whether a random
+   flame is a picture or a cloud of specks.  For n similar maps each
+   contracting by s, the attractor's similarity dimension is
+   log(n)/log(1/s), so picking s = n^(-1/d) for a target d near 1.5-2
+   aims straight at attractors that fill area instead of collapsing to
+   dust.  Drawing s uniformly from [0.3, 0.9] - the obvious thing - gives
+   dimension well under 1 for two transforms, which is exactly the
+   scattered-fragments failure. */
+function randomAffine(n, dim){
+  n = n || 3; dim = dim || 1.8;
+  var base = Math.pow(n, -1/dim);
+  var ang = Math.random()*TAU;
+  var s1 = base * (0.80 + Math.random()*0.48);
+  var s2 = base * (0.80 + Math.random()*0.48);
+  var shear = (Math.random()-0.5)*0.55;
+  var ang2 = ang + PI/2 + shear;
+  var tr = 0.55 + 0.75*(1 - base);
+  return [ s1*Math.cos(ang), s2*Math.cos(ang2), (Math.random()*2-1)*tr,
+           s1*Math.sin(ang), s2*Math.sin(ang2), (Math.random()*2-1)*tr ];
+}
+
+function randomCandidate(){
+  var NPICK = [2,3,3,3,4,4];
+  var n = NPICK[(Math.random()*NPICK.length) | 0];
+  var dim = 1.45 + Math.random()*0.62;
+  var f = defaultFlame(), i, k;
+  f.xforms = [];
+  for(i = 0; i < n; i++){
+    var x = mkXform(randomAffine(n, dim), {}, 0.25 + Math.random()*0.95,
+                    (i/n + Math.random()*0.16) % 1);
+    var nv = 1 + (Math.random()*3 | 0);         /* 1 to 3 active variations */
+    var picks = [], tot = 0;
+    for(k = 0; k < nv; k++){
+      var vidx = VPICK[(Math.random()*VPICK.length) | 0];
+      if(picks.indexOf(vidx) < 0) picks.push(vidx);
+    }
+    for(k = 0; k < picks.length; k++){ var w = 0.2 + Math.random(); x.v[picks[k]] = w; tot += w; }
+    for(k = 0; k < picks.length; k++) x.v[picks[k]] /= tot;
+    f.xforms.push(x);
+  }
+  f.finalEnabled = Math.random() < 0.22;
+  if(f.finalEnabled){
+    var fx = mkXform([0.8+Math.random()*0.4, (Math.random()-0.5)*0.4, (Math.random()-0.5)*0.5,
+                      (Math.random()-0.5)*0.4, 0.8+Math.random()*0.4, (Math.random()-0.5)*0.5], {}, 1, 0.5);
+    fx.v[VPICK[(Math.random()*VPICK.length)|0]] = 1;
+    f.final = fx;
+  }
+  f.palIndex = (Math.random()*PALETTES.length) | 0;
+  f.palStops = paletteStops(f.palIndex);
+  f.palOffset = Math.random();
+  f.palReverse = Math.random() < 0.5;
+  f.vibrancy = 0.42 + Math.random()*0.55;
+  f.sparse = flame.sparse;
+  f.gamma = 1.8 + Math.random()*1.5;
+  f.brightness = 1.15 + Math.random()*1.15;
+  f.background = flame.background.slice();
+  f.view = {cx:0, cy:0, zoom:0.42, rot:0};
+  return f;
+}
+
+function randomize(){
+  var keep = flame, best = null, bestScore = -1, i, p;
+  for(i = 0; i < 26; i++){
+    var cand = randomCandidate();
+    flame = cand;
+    compile();
+    p = probe(12000);
+    if(p.ok){ best = cand; bestScore = 1e9; fitTo(p); break; }
+    var score = p.cells > 3850 ? (4096 - p.cells) : p.cells;
+    if(score > bestScore){ bestScore = score; best = cand; }
+  }
+  flame = best || keep;
+  compile();
+  if(bestScore < 1e9){ var q = probe(20000); fitTo(q); }
+  resetAccumulation();
+}
+
+function mutateFlame(amount){
+  amount = amount === undefined ? 1 : amount;
+  var f = cloneFlame(flame), i, k;
+  for(i = 0; i < f.xforms.length; i++){
+    var x = f.xforms[i];
+    for(k = 0; k < 6; k++) x.co[k] += gauss()*0.075*amount;
+    x.weight = Math.max(0.03, x.weight * Math.exp(gauss()*0.20*amount));
+    x.color = (x.color + gauss()*0.05*amount + 1) % 1;
+    for(k = 0; k < NV; k++) if(x.v[k] !== 0) x.v[k] = Math.max(0, x.v[k] + gauss()*0.08*amount);
+    if(Math.random() < 0.16*amount){
+      var vidx = VPICK[(Math.random()*VPICK.length)|0];
+      x.v[vidx] = x.v[vidx] > 0 ? 0 : (0.25 + Math.random()*0.5);
+    }
+    var s = 0;
+    for(k = 0; k < NV; k++) s += x.v[k];
+    if(s <= 0) x.v[0] = 1;
+  }
+  if(Math.random() < 0.25) f.palOffset = (f.palOffset + gauss()*0.12 + 1) % 1;
+  if(Math.random() < 0.12) f.vibrancy = Math.min(1, Math.max(0, f.vibrancy + gauss()*0.12));
+  flame = f;
+  compile();
+  var p = probe(16000);
+  if(p.ok || p.cells > 60) fitTo(p);
+  resetAccumulation();
+}
+
+/* ---------------------------------------------------------------------
+   ACCUMULATION CONTROL
+   The histogram is only ever cleared when a parameter actually changes.
+   Everything else adds to it, which is what lets the image keep refining
+   from noise to smooth over minutes.
+   --------------------------------------------------------------------- */
+var dirtyDisplay = true, samplesSinceTone = 0;
+
+function resetAccumulation(){
+  updateView();
+  clearHistogram();
+  if(gpuOn) gpuReset();
+  samplesSinceTone = 0;
+  dirtyDisplay = true;
+}
+function paramChanged(){ compile(); resetAccumulation(); }
+function displayChanged(){ dirtyDisplay = true; }
+
+/* Recolour without discarding the accumulation.  Each pixel's mean colour
+   index is mapped through the new palette; where a pixel is dominated by
+   one index - the usual case, and the reason structural colouring works -
+   this is exactly what re-accumulating would give, and it means you can
+   try palettes on a fully resolved image instead of starting over. */
+function recolour(){
+  buildPaletteLUT();
+  if(gpuOn){
+    /* the GPU accumulates finished colours and has no colour-index
+       channel to remap, so a palette change restarts - which at GPU
+       speed costs a fraction of a second */
+    gpuUploadPalette();
+    resetAccumulation();
+    return;
+  }
+  if(!hist){ return; }
+  var n = hist.length, i, d, ci;
+  for(i = 0; i < n; i++){
+    d = hist[i];
+    if(d === 0){ hr[i] = 0; hg[i] = 0; hb[i] = 0; continue; }
+    var c = hc[i] / d;
+    ci = c <= 0 ? 0 : (c >= 1 ? 255 : (c*256)|0);
+    hr[i] = palR[ci]*d; hg[i] = palG[ci]*d; hb[i] = palB[ci]*d;
+  }
+  dirtyDisplay = true;
+}
+
+function renormalize(){
+  if(!hist) return;
+  var s = 1 / accWeight, i, n = hist.length;
+  for(i = 0; i < n; i++){ hist[i] *= s; hr[i] *= s; hg[i] *= s; hb[i] *= s; hc[i] *= s; }
+  dmax *= s;
+  accWeight = 1;
+}
+
+/* ---------------------------------------------------------------------
+   UNDO / REDO
+   --------------------------------------------------------------------- */
+var undoStack = [], redoStack = [], lastCommitted = null, UNDO_MAX = 40;
+function snapshot(){ return JSON.stringify(flame); }
+function pushUndo(state){
+  if(state === undefined) state = lastCommitted;
+  if(state === null || state === undefined) return;
+  if(undoStack.length && undoStack[undoStack.length-1] === state) return;
+  undoStack.push(state);
+  if(undoStack.length > UNDO_MAX) undoStack.shift();
+  redoStack.length = 0;
+  lastCommitted = snapshot();
+  refreshUndoButtons();
+}
+function commit(){ pushUndo(lastCommitted); }
+function applyState(s){
+  flame = JSON.parse(s);
+  lastCommitted = s;
+  compile();
+  resetAccumulation();
+  syncUI();
+  buildPaletteEditor();
+  refreshUndoButtons();
+}
+function undo(){
+  if(!undoStack.length) return;
+  redoStack.push(snapshot());
+  applyState(undoStack.pop());
+  toast('Undo');
+}
+function redo(){
+  if(!redoStack.length) return;
+  undoStack.push(snapshot());
+  applyState(redoStack.pop());
+  toast('Redo');
+}
+function refreshUndoButtons(){
+  $('bUndo').disabled = !undoStack.length;
+  $('bRedo').disabled = !redoStack.length;
+}
+
+/* ---------------------------------------------------------------------
+   SCREENSAVER
+   --------------------------------------------------------------------- */
+/* Fold the pose on screen back into the stored flame, so stopping the
+   animation - or leaving the screensaver - keeps the image you were
+   looking at instead of snapping back to the start of the loop. */
+function bakeAnimation(){
+  if(!ca || !nxf) return;
+  var i, k, x;
+  for(i = 0; i < nxf; i++){
+    x = compiledXs[i];
+    for(k = 0; k < 6; k++) x.co[k] = ca[i*6 + k];
+  }
+  if(finalOn && fCo) for(k = 0; k < 6; k++) flame.final.co[k] = fCo[k];
+  if(vW0 && vSlot){
+    var all = compiledXs.slice();
+    if(finalOn) all.push(flame.final);
+    for(i = 0; i < all.length; i++){
+      for(k = vStart[i]; k < vStart[i+1]; k++) all[i].v[vSlot[k]] = vW[k];
+    }
+  }
+  flame.view.zoom = Math.max(0.005, flame.view.zoom * viewZoomMul);
+  flame.view.rot += viewRotAdd;
+  flame.palOffset = (flame.palOffset + palAnimOff) % 1;
+  viewZoomMul = 1; viewRotAdd = 0; palAnimOff = 0;
+  animPhase = 0;
+  compile();
+  applyCoefs();   /* ca is now exactly the baked pose, with no motion on top */
+  updateView();
+}
+var saverBackup = null;
+
+function enterSaver(){
+  if(saver) return;
+  saver = true;
+  saverEnteredAt = performance.now();
+  /* the saver mutates and replaces flames as it runs; none of that is
+     allowed to touch what the user was working on */
+  saverBackup = snapshot();
+  document.body.classList.add('ssaver');
+  lastNewFlame = performance.now();
+  fadeFrom = null;
+  refreshAnimState();
+  drawOverlay();       /* clears the handles the panel left behind */
+}
+function exitSaver(){
+  if(!saver) return;
+  saver = false;
+  document.body.classList.remove('ssaver');
+  fadeFrom = null;
+  if(settings.saverKeep){
+    refreshAnimState();      /* bake the pose and adopt the saver's flame */
+    commit();
+    toast('Kept the screensaver flame');
+  } else {
+    /* animOn is set directly rather than through refreshAnimState: baking
+       here would write the saver's pose into the flame being restored */
+    animOn = anim.on;
+    if(saverBackup){
+      flame = JSON.parse(saverBackup);
+      lastCommitted = saverBackup;
+    }
+    selX = 0; selStop = 0; animPhase = 0;
+    viewZoomMul = 1; viewRotAdd = 0; palAnimOff = 0;
+    compile();
+    accWeight = 1;
+    allocate();
+    toast('Your flame is back, unchanged');
+  }
+  saverBackup = null;
+  syncUI();
+  buildPaletteEditor();
+  drawOverlay();
+}
+function nextSaverFlame(){
+  if(gpuOn){
+    gpuCaptureFade();
+    fadeFrom = true;          /* a marker; the outgoing frame lives in a texture */
+  } else {
+    if(!imgBuf) return;
+    if(!fadeFrom || fadeFrom.length !== imgBuf.length) fadeFrom = new Uint8ClampedArray(imgBuf.length);
+    fadeFrom.set(imgBuf);
+  }
+  bakeAnimation();
+  if(settings.saverMutate && Math.random() < 0.72) mutateFlame(1.35); else randomize();
+  animPhase = 0;
+  accWeight = 1;
+  resetAccumulation();
+  /* give the incoming flame a head start so the fade is between two
+     images rather than between an image and a cloud of noise */
+  if(gpuOn){ gpuUploadFlame(); gpuIterate(10); gpuReduce(); gpuReadDmax(); gpuToneMap(); }
+  else iterate(Math.min(2200000, histW*histH*3));
+  fadeT = 0;
+  fadeDur = Math.max(0.3, settings.fade);
+  lastNewFlame = performance.now();
+}
+function stepAnimation(dt){
+  animPhase += dt / Math.max(0.5, anim.loop);
+  animPhase -= Math.floor(animPhase);
+  applyAnimation();
+  /* exponential decay of the accumulation, done by weighting new samples
+     up rather than scaling five buffers every frame */
+  if(gpuOn) return;        /* the GPU decays the buffer itself */
+  accWeight /= Math.max(0.5, Math.min(0.995, anim.trail));
+  if(accWeight > 1e18) renormalize();
+}
+
+/* Turning animation on or off changes how the histogram is used - decaying
+   history versus endless progressive refinement - and how big it is. */
+function refreshAnimState(){
+  var want = anim.on || saver;
+  if(want === animOn) return;
+  if(want){
+    animOn = true;
+    animPhase = 0;
+  } else {
+    /* clear the flag first: the recompile inside bakeAnimation must lay
+       down plain coefficients, not the pose with phase-zero motion on it */
+    animOn = false;
+    bakeAnimation();
+  }
+  accWeight = 1;
+  allocate();
+}
+
+/* =====================================================================
+   GPU BACKEND (WebGL2)
+   ---------------------------------------------------------------------
+   The CPU renderer is limited by two things at 4K, and tone mapping is
+   the lesser one.  The harder limit is sample density: a 4K frame is
+   8.3M pixels, and one CPU frame can only afford ~250k samples, so an
+   animated frame would carry about 0.03 samples per pixel - noise, no
+   matter how fast the tone map ran.
+
+   So the chaos game itself moves to the GPU.  A million points live in a
+   float texture; one pass advances all of them at once, and drawing them
+   as points with additive blending into an RGBA32F target accumulates
+   exactly what the CPU histogram holds (rgb = colour sums, a = density).
+   That is worth two orders of magnitude of throughput, which is what
+   makes 4K animation possible at all.
+   ===================================================================== */
+var GL_COMMON = [
+'const float PI = 3.141592653589793;',
+'const float EPSV = 1e-10;',
+'const float BOUNDV = 1e6;',
+'const float FUSEV = 20.0;',
+'uint hashu(uint x){',
+'  x ^= x >> 16u; x *= 0x7feb352du;',
+'  x ^= x >> 15u; x *= 0x846ca68bu;',
+'  x ^= x >> 16u; return x;',
+'}',
+'float rnd(inout uint s){ s = hashu(s); return float(s >> 8u) * (1.0/16777216.0); }',
+'uniform float uVarW[140];',
+'vec2 variate(int base, vec2 t, inout uint sd){',
+'  float r2 = dot(t, t);',
+'  float r = sqrt(r2);',
+'  float th = atan(t.x, t.y);',
+'  vec2 v = vec2(0.0);',
+'  for(int k = 0; k < 20; k++){',
+'    float w = uVarW[base + k];',
+'    if(w == 0.0) continue;',
+'    if(k == 0){ v += w*t; }',
+'    else if(k == 1){ v += w*sin(t); }',
+'    else if(k == 2){ v += (w/(r2+EPSV))*t; }',
+'    else if(k == 3){ float s3=sin(r2), c3=cos(r2);',
+'                     v += w*vec2(t.x*s3 - t.y*c3, t.x*c3 + t.y*s3); }',
+'    else if(k == 4){ float q=w/(r+EPSV);',
+'                     v += q*vec2((t.x-t.y)*(t.x+t.y), 2.0*t.x*t.y); }',
+'    else if(k == 5){ v += w*vec2(th/PI, r - 1.0); }',
+'    else if(k == 6){ v += w*r*vec2(sin(th+r), cos(th-r)); }',
+'    else if(k == 7){ float a7=r*th; v += w*r*vec2(sin(a7), -cos(a7)); }',
+'    else if(k == 8){ float q=w*th/PI; v += q*vec2(sin(PI*r), cos(PI*r)); }',
+'    else if(k == 9){ float q=w/(r+EPSV);',
+'                     v += q*vec2(cos(th)+sin(r), sin(th)-cos(r)); }',
+'    else if(k == 10){ v += vec2(w*sin(th)/(r+EPSV), w*r*cos(th)); }',
+'    else if(k == 11){ v += w*vec2(sin(th)*cos(r), cos(th)*sin(r)); }',
+'    else if(k == 12){ float n0=sin(th+r), n1=cos(th-r);',
+'                      float m0=n0*n0*n0*r, m1=n1*n1*n1*r;',
+'                      v += w*vec2(m0+m1, m0-m1); }',
+'    else if(k == 13){ float rr=sqrt(r); float t13=atan(t.x, t.y)*0.5;',
+'                      if(rnd(sd) < 0.5) t13 += PI;',
+'                      v += w*rr*vec2(cos(t13), sin(t13)); }',
+'    else if(k == 14){ float ex=w*exp(t.x - 1.0);',
+'                      v += ex*vec2(cos(PI*t.y), sin(PI*t.y)); }',
+'    else if(k == 15){ float pw=w*pow(r+EPSV, sin(th));',
+'                      v += pw*vec2(cos(th), sin(th)); }',
+'    else if(k == 16){ v += w*vec2(cos(PI*t.x)*cosh(t.y), -sin(PI*t.x)*sinh(t.y)); }',
+'    else if(k == 17){ v += (w*2.0/(r+1.0))*t; }',
+'    else if(k == 18){ v += (w*4.0/(r2+4.0))*t; }',
+'    else if(k == 19){ v += w*vec2(sin(t.x), t.y); }',
+'  }',
+'  return v;',
+'}'].join('\n');
+
+var GL_HDR = '#version 300 es\nprecision highp float;\nprecision highp int;\n';
+
+var SH_QUAD_VS = GL_HDR + 'in vec2 aP;\nvoid main(){ gl_Position = vec4(aP, 0.0, 1.0); }';
+
+var SH_SEED_FS = GL_HDR +
+'uniform uint uSeed;\nout vec4 o;\n' +
+'uint hashu(uint x){ x ^= x >> 16u; x *= 0x7feb352du; x ^= x >> 15u; x *= 0x846ca68bu; x ^= x >> 16u; return x; }\n' +
+'float g(uint s){ return float(hashu(s) >> 8u) * (1.0/16777216.0); }\n' +
+'void main(){\n' +
+'  ivec2 ip = ivec2(gl_FragCoord.xy);\n' +
+'  uint sd = hashu(uint(ip.x)*7919u + uint(ip.y)*104729u + uSeed);\n' +
+'  o = vec4(g(sd)*2.0-1.0, g(sd*3u+1u)*2.0-1.0, g(sd*7u+5u), 20.0);\n' +
+'}';
+
+var SH_ITER_FS = GL_HDR + GL_COMMON + '\n' +
+'uniform sampler2D uState;\n' +
+'uniform int uNX;\n' +
+'uniform float uCdf[7];\n' +
+'uniform mat2 uLin[7];\n' +
+'uniform vec2 uOff[7];\n' +
+'uniform float uXCol[7];\n' +
+'uniform uint uSeed;\n' +
+'out vec4 oState;\n' +
+'void main(){\n' +
+'  ivec2 ip = ivec2(gl_FragCoord.xy);\n' +
+'  vec4 st = texelFetch(uState, ip, 0);\n' +
+'  vec2 p = st.xy; float c = st.z; float fu = st.w;\n' +
+'  uint sd = hashu(uint(ip.x)*1973u + uint(ip.y)*9277u + uSeed);\n' +
+'  float rv = rnd(sd);\n' +
+'  int j = uNX - 1;\n' +
+'  for(int k = 0; k < 7; k++){ if(k < uNX && rv < uCdf[k]){ j = k; break; } }\n' +
+'  vec2 t = uLin[j] * p + uOff[j];\n' +
+'  p = variate(j*20, t, sd);\n' +
+'  c = (c + uXCol[j]) * 0.5;\n' +
+'  if(!(abs(p.x) < BOUNDV && abs(p.y) < BOUNDV)){\n' +
+'    p = vec2(rnd(sd)*2.0-1.0, rnd(sd)*2.0-1.0); c = rnd(sd); fu = FUSEV;\n' +
+'  } else if(fu > 0.0){ fu -= 1.0; }\n' +
+'  oState = vec4(p, c, fu);\n' +
+'}';
+
+var SH_PLOT_VS = GL_HDR + GL_COMMON + '\n' +
+'uniform sampler2D uState;\n' +
+'uniform int uP;\n' +
+'uniform vec2 uCam;\n' +
+'uniform vec2 uRot;\n' +
+'uniform float uScale;\n' +
+'uniform vec2 uHalf;\n' +
+'uniform int uFinalOn;\n' +
+'uniform int uFinalBase;\n' +
+'uniform mat2 uFLin;\n' +
+'uniform vec2 uFOff;\n' +
+'uniform uint uSeed;\n' +
+'out float vC;\n' +
+'void main(){\n' +
+'  int id = gl_VertexID;\n' +
+'  ivec2 ip = ivec2(id % uP, id / uP);\n' +
+'  vec4 st = texelFetch(uState, ip, 0);\n' +
+'  vC = st.z;\n' +
+'  gl_PointSize = 1.0;\n' +
+'  if(st.w > 0.0){ gl_Position = vec4(2.0, 2.0, 0.0, 1.0); return; }\n' +
+'  vec2 q = st.xy;\n' +
+'  if(uFinalOn == 1){\n' +
+'    uint sd = hashu(uint(id)*2654435761u + uSeed);\n' +
+'    q = variate(uFinalBase, uFLin * q + uFOff, sd);\n' +
+'    if(!(abs(q.x) < BOUNDV && abs(q.y) < BOUNDV)){\n' +
+'      gl_Position = vec4(2.0, 2.0, 0.0, 1.0); return; }\n' +
+'  }\n' +
+'  vec2 d = q - uCam;\n' +
+'  vec2 e = vec2(d.x*uRot.x - d.y*uRot.y, d.x*uRot.y + d.y*uRot.x) * uScale;\n' +
+'  if(abs(e.x) > uHalf.x || abs(e.y) > uHalf.y){\n' +
+'    gl_Position = vec4(2.0, 2.0, 0.0, 1.0); return; }\n' +
+'  gl_Position = vec4(e.x/uHalf.x, e.y/uHalf.y, 0.0, 1.0);\n' +
+'}';
+
+var SH_PLOT_FS = GL_HDR +
+'uniform sampler2D uPal;\nin float vC;\nout vec4 o;\n' +
+'void main(){ o = vec4(texture(uPal, vec2(clamp(vC, 0.0, 1.0), 0.5)).rgb, 1.0); }';
+
+/* src factor ZERO, dst factor CONSTANT_COLOR: multiplies what is already
+   there by the trail constant.  One draw call instead of scaling the whole
+   accumulation buffer by hand. */
+var SH_DECAY_FS = GL_HDR + 'out vec4 o;\nvoid main(){ o = vec4(1.0); }';
+
+var SH_REDUCE_FS = GL_HDR +
+'uniform sampler2D uSrc;\nuniform ivec2 uSrcSize;\nout vec4 o;\n' +
+'void main(){\n' +
+'  ivec2 b = ivec2(gl_FragCoord.xy) * 4;\n' +
+'  float m = 0.0;\n' +
+'  for(int y = 0; y < 4; y++){\n' +
+'    for(int x = 0; x < 4; x++){\n' +
+'      ivec2 q = b + ivec2(x, y);\n' +
+'      if(q.x < uSrcSize.x && q.y < uSrcSize.y) m = max(m, texelFetch(uSrc, q, 0).a);\n' +
+'    }\n' +
+'  }\n' +
+'  o = vec4(m);\n' +
+'}';
+
+var SH_TONE_FS = GL_HDR +
+'uniform sampler2D uAcc;\n' +
+'uniform float uLogInv, uGammaInv, uVib, uBright, uCut;\n' +
+'uniform vec3 uBg;\n' +
+'uniform int uSS;\n' +
+'out vec4 o;\n' +
+'void main(){\n' +
+'  ivec2 p = ivec2(gl_FragCoord.xy);\n' +
+'  vec4 acc;\n' +
+'  if(uSS == 1) acc = texelFetch(uAcc, p, 0);\n' +
+'  else {\n' +
+'    ivec2 b = p * 2;\n' +
+'    acc = texelFetch(uAcc, b, 0) + texelFetch(uAcc, b + ivec2(1,0), 0)\n' +
+'        + texelFetch(uAcc, b + ivec2(0,1), 0) + texelFetch(uAcc, b + ivec2(1,1), 0);\n' +
+'  }\n' +
+'  float d = acc.a;\n' +
+'  if(d <= 0.0){ o = vec4(uBg, 1.0); return; }\n' +
+'  float a = log(1.0 + d) * uLogInv;\n' +
+'  if(uCut > 0.0) a *= d / (d + uCut);\n' +
+'  float ga = pow(a, uGammaInv);\n' +
+'  vec3 col = acc.rgb / d;\n' +
+'  vec3 c = ((1.0 - uVib) * pow(max(col*a, vec3(0.0)), vec3(uGammaInv)) + uVib * col * ga) * uBright;\n' +
+'  o = vec4(uBg + c, 1.0);\n' +
+'}';
+
+var SH_COMP_FS = GL_HDR +
+'uniform sampler2D uTone;\nuniform sampler2D uFade;\n' +
+'uniform float uFadeT;\nuniform vec2 uSize;\nout vec4 o;\n' +
+'void main(){\n' +
+'  vec2 uv = gl_FragCoord.xy / uSize;\n' +
+'  vec3 c = texture(uTone, uv).rgb;\n' +
+'  if(uFadeT < 1.0) c = mix(texture(uFade, uv).rgb, c, uFadeT);\n' +
+'  o = vec4(c, 1.0);\n' +
+'}';
+
+/* ---------------------------------------------------------------------
+   GPU STATE
+   --------------------------------------------------------------------- */
+var glc = null, gl = null, glReady = false, gpuOn = false, gpuWhy = '';
+var GP = 1024;                       /* GP x GP particles live on the GPU */
+var gpuK = 4;                        /* iterate/plot rounds per frame */
+var glProg = {}, glTex = {}, glFbo = {}, glLoc = {};
+var glVaoQuad = null, glVaoNone = null, glQuadBuf = null;
+var glReduce = [], glReadBuf = new Float32Array(4);
+var gpuDmax = 1, gpuPending = false, gpuFrameNo = 0;
+var glLin = new Float32Array(28), glOff = new Float32Array(14);
+var glCdf = new Float32Array(7), glCol = new Float32Array(7), glVar = new Float32Array(140);
+var glPalBuf = new Float32Array(256 * 4);
+var GPU_MAXCELLS = 20000000;
+
+function glU(prog, name){
+  var key = prog.__id + '|' + name;
+  var l = glLoc[key];
+  if(l === undefined){ l = gl.getUniformLocation(prog, name); glLoc[key] = l; }
+  return l;
+}
+function glShader(type, src){
+  var sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+    gpuWhy = 'shader: ' + gl.getShaderInfoLog(sh);
+    return null;
+  }
+  return sh;
+}
+var glProgId = 0;
+function glProgram(vs, fs){
+  var a = glShader(gl.VERTEX_SHADER, vs), b = glShader(gl.FRAGMENT_SHADER, fs);
+  if(!a || !b) return null;
+  var p = gl.createProgram();
+  gl.attachShader(p, a); gl.attachShader(p, b);
+  gl.bindAttribLocation(p, 0, 'aP');
+  gl.linkProgram(p);
+  if(!gl.getProgramParameter(p, gl.LINK_STATUS)){
+    gpuWhy = 'link: ' + gl.getProgramInfoLog(p);
+    return null;
+  }
+  p.__id = ++glProgId;
+  return p;
+}
+function glTexF(w, h){
+  var t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+function glTex8(w, h){
+  var t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+function glFboFor(tex){
+  var f = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return f;
+}
+function glDrawQuad(){
+  gl.bindVertexArray(glVaoQuad);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+function gpuInit(){
+  if(glReady) return true;
+  if(gpuWhy) return false;
+  glc = $('glflame');
+  try{
+    gl = glc.getContext('webgl2', {alpha:false, antialias:false, depth:false,
+                                   stencil:false, premultipliedAlpha:false,
+                                   /* kept so a screenshot, toDataURL or a
+                                      video capture never lands on an empty
+                                      buffer between frames */
+                                   preserveDrawingBuffer:true, powerPreference:'high-performance'});
+  }catch(e){ gl = null; }
+  if(!gl){ gpuWhy = 'no WebGL2'; return false; }
+  if(!gl.getExtension('EXT_color_buffer_float')){ gpuWhy = 'no float render targets'; return false; }
+  if(!gl.getExtension('EXT_float_blend')){ gpuWhy = 'no float blending'; return false; }
+
+  glProg.seed   = glProgram(SH_QUAD_VS, SH_SEED_FS);
+  glProg.iter   = glProgram(SH_QUAD_VS, SH_ITER_FS);
+  glProg.plot   = glProgram(SH_PLOT_VS, SH_PLOT_FS);
+  glProg.decay  = glProgram(SH_QUAD_VS, SH_DECAY_FS);
+  glProg.reduce = glProgram(SH_QUAD_VS, SH_REDUCE_FS);
+  glProg.tone   = glProgram(SH_QUAD_VS, SH_TONE_FS);
+  glProg.comp   = glProgram(SH_QUAD_VS, SH_COMP_FS);
+  var k;
+  for(k in glProg) if(!glProg[k]) return false;
+
+  glQuadBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, glQuadBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  glVaoQuad = gl.createVertexArray();
+  gl.bindVertexArray(glVaoQuad);
+  gl.bindBuffer(gl.ARRAY_BUFFER, glQuadBuf);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  /* the plot pass has no attributes at all - positions come from the state
+     texture via gl_VertexID - but WebGL2 still wants a bound VAO */
+  glVaoNone = gl.createVertexArray();
+  gl.bindVertexArray(null);
+
+  glTex.stateA = glTexF(GP, GP); glFbo.stateA = glFboFor(glTex.stateA);
+  glTex.stateB = glTexF(GP, GP); glFbo.stateB = glFboFor(glTex.stateB);
+  glTex.pal = glTexF(256, 1);
+
+  gl.disable(gl.DEPTH_TEST);
+  gl.disable(gl.SCISSOR_TEST);
+  glc.addEventListener('webglcontextlost', function(ev){
+    ev.preventDefault();
+    glReady = false; gpuOn = false;
+    gpuWhy = 'the GPU context was lost';
+    settings.renderer = 'cpu';
+    allocate(); syncUI();
+    toast('GPU context lost - continuing on the CPU');
+  }, false);
+  glReady = true;
+  return true;
+}
+
+/* One frame's GPU work is rounds x 1M points plus a handful of passes over
+   the accumulation buffer.  Left uncapped at 4K that can exceed the driver's
+   watchdog timeout in a single submission, which resets the GPU; the ceiling
+   comes down as the buffer grows. */
+function gpuMaxRounds(){
+  var cells = histW * histH;
+  if(cells > 6000000) return 8;
+  if(cells > 3000000) return 12;
+  return 16;
+}
+
+function gpuFreeChain(){
+  var i;
+  for(i = 0; i < glReduce.length; i++){
+    gl.deleteTexture(glReduce[i].t);
+    gl.deleteFramebuffer(glReduce[i].f);
+  }
+  glReduce = [];
+}
+
+function gpuAlloc(){
+  if(!glReady) return;
+  if(glTex.acc){ gl.deleteTexture(glTex.acc); gl.deleteFramebuffer(glFbo.acc); }
+  if(glTex.tone){ gl.deleteTexture(glTex.tone); gl.deleteFramebuffer(glFbo.tone); }
+  if(glTex.fade){ gl.deleteTexture(glTex.fade); gl.deleteFramebuffer(glFbo.fade); }
+  glTex.acc  = glTexF(histW, histH); glFbo.acc  = glFboFor(glTex.acc);
+  glTex.tone = glTex8(outW, outH);   glFbo.tone = glFboFor(glTex.tone);
+  glTex.fade = glTex8(outW, outH);   glFbo.fade = glFboFor(glTex.fade);
+
+  gpuFreeChain();
+  var w = histW, h = histH;
+  while(w > 1 || h > 1){
+    w = Math.max(1, Math.ceil(w / 4));
+    h = Math.max(1, Math.ceil(h / 4));
+    var t = glTexF(w, h);
+    glReduce.push({t:t, f:glFboFor(t), w:w, h:h});
+  }
+  glc.width = outW; glc.height = outH;
+  gpuPending = false;
+  if(gpuK > gpuMaxRounds()) gpuK = gpuMaxRounds();
+  gpuReset();
+}
+
+function gpuUploadPalette(){
+  var i;
+  gl.activeTexture(gl.TEXTURE1);
+  for(i = 0; i < 256; i++){
+    glPalBuf[i*4] = palR[i]; glPalBuf[i*4+1] = palG[i];
+    glPalBuf[i*4+2] = palB[i]; glPalBuf[i*4+3] = 1;
+  }
+  gl.bindTexture(gl.TEXTURE_2D, glTex.pal);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 256, 1, 0, gl.RGBA, gl.FLOAT, glPalBuf);
+}
+
+function gpuReset(){
+  if(!glReady || !glTex.acc) return;
+  gl.disable(gl.BLEND);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, glFbo.acc);
+  gl.viewport(0, 0, histW, histH);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  /* scatter the particles: a shader is faster than uploading a megabyte */
+  gl.bindFramebuffer(gl.FRAMEBUFFER, glFbo.stateA);
+  gl.viewport(0, 0, GP, GP);
+  gl.useProgram(glProg.seed);
+  gl.uniform1ui(glU(glProg.seed, 'uSeed'), (Math.random() * 4294967295) >>> 0);
+  glDrawQuad();
+  gpuDmax = 1;
+  gpuPending = false;
+  totalSamples = 0;
+}
+
+/* Pack the compiled flame into the uniform layout the shaders expect.
+   Reads the same ca / vW arrays the CPU path uses, so animation, morphing
+   and every slider drive both renderers identically. */
+function gpuUploadFlame(){
+  var i, k, o;
+  glVar.fill(0);
+  for(i = 0; i < nxf; i++){
+    o = i * 6;
+    glLin[i*4]   = ca[o];   glLin[i*4+1] = ca[o+3];
+    glLin[i*4+2] = ca[o+1]; glLin[i*4+3] = ca[o+4];
+    glOff[i*2] = ca[o+2]; glOff[i*2+1] = ca[o+5];
+    glCdf[i] = cdf[i];
+    glCol[i] = xcol[i];
+    for(k = vStart[i]; k < vStart[i+1]; k++) glVar[i*20 + vSlot[k]] = vW[k];
+  }
+  for(i = nxf; i < 7; i++){ glCdf[i] = 1; glCol[i] = 0; }
+  if(finalOn){
+    for(k = vStart[nxf]; k < vStart[nxf+1]; k++) glVar[nxf*20 + vSlot[k]] = vW[k];
+  }
+}
+
+function gpuIterate(rounds){
+  var i, seedBase = (gpuFrameNo * 2654435761) >>> 0;
+  gl.disable(gl.BLEND);
+  for(i = 0; i < rounds; i++){
+    /* advance every particle one step: stateA -> stateB */
+    gl.bindFramebuffer(gl.FRAMEBUFFER, glFbo.stateB);
+    gl.viewport(0, 0, GP, GP);
+    gl.useProgram(glProg.iter);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, glTex.stateA);
+    gl.uniform1i(glU(glProg.iter, 'uState'), 0);
+    gl.uniform1i(glU(glProg.iter, 'uNX'), nxf);
+    gl.uniform1fv(glU(glProg.iter, 'uCdf'), glCdf);
+    gl.uniformMatrix2fv(glU(glProg.iter, 'uLin'), false, glLin);
+    gl.uniform2fv(glU(glProg.iter, 'uOff'), glOff);
+    gl.uniform1fv(glU(glProg.iter, 'uXCol'), glCol);
+    gl.uniform1fv(glU(glProg.iter, 'uVarW'), glVar);
+    gl.uniform1ui(glU(glProg.iter, 'uSeed'), (seedBase + i * 7919) >>> 0);
+    glDrawQuad();
+    var tmpT = glTex.stateA, tmpF = glFbo.stateA;
+    glTex.stateA = glTex.stateB; glFbo.stateA = glFbo.stateB;
+    glTex.stateB = tmpT; glFbo.stateB = tmpF;
+
+    /* plot them, additively, into the accumulation buffer */
+    gl.bindFramebuffer(gl.FRAMEBUFFER, glFbo.acc);
+    gl.viewport(0, 0, histW, histH);
+    gl.enable(gl.BLEND);
+    gl.blendEquation(gl.FUNC_ADD);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    gl.useProgram(glProg.plot);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, glTex.stateA);
+    gl.uniform1i(glU(glProg.plot, 'uState'), 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, glTex.pal);
+    gl.uniform1i(glU(glProg.plot, 'uPal'), 1);
+    gl.uniform1i(glU(glProg.plot, 'uP'), GP);
+    gl.uniform2f(glU(glProg.plot, 'uCam'), vcx, vcy);
+    gl.uniform2f(glU(glProg.plot, 'uRot'), vcos, vsin);
+    gl.uniform1f(glU(glProg.plot, 'uScale'), vscale);
+    gl.uniform2f(glU(glProg.plot, 'uHalf'), histW / 2, histH / 2);
+    gl.uniform1i(glU(glProg.plot, 'uFinalOn'), finalOn ? 1 : 0);
+    gl.uniform1i(glU(glProg.plot, 'uFinalBase'), nxf * 20);
+    gl.uniform1fv(glU(glProg.plot, 'uVarW'), glVar);
+    gl.uniform1ui(glU(glProg.plot, 'uSeed'), (seedBase + i * 104729) >>> 0);
+    if(finalOn){
+      gl.uniformMatrix2fv(glU(glProg.plot, 'uFLin'), false,
+        new Float32Array([fCo[0], fCo[3], fCo[1], fCo[4]]));
+      gl.uniform2f(glU(glProg.plot, 'uFOff'), fCo[2], fCo[5]);
+    }
+    gl.bindVertexArray(glVaoNone);
+    gl.drawArrays(gl.POINTS, 0, GP * GP);
+    gl.disable(gl.BLEND);
+  }
+  totalSamples += rounds * GP * GP;
+}
+
+function gpuDecay(t){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, glFbo.acc);
+  gl.viewport(0, 0, histW, histH);
+  gl.enable(gl.BLEND);
+  gl.blendEquation(gl.FUNC_ADD);
+  gl.blendFunc(gl.ZERO, gl.CONSTANT_COLOR);
+  gl.blendColor(t, t, t, t);
+  gl.useProgram(glProg.decay);
+  glDrawQuad();
+  gl.disable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE);
+}
+
+/* Peak density, found by a chain of 4x max reductions.  The result is read
+   back one frame late so the readPixels never stalls on work the GPU is
+   still doing. */
+function gpuReduce(){
+  var i, srcT = glTex.acc, sw = histW, sh = histH;
+  gl.disable(gl.BLEND);
+  gl.useProgram(glProg.reduce);
+  for(i = 0; i < glReduce.length; i++){
+    var d = glReduce[i];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, d.f);
+    gl.viewport(0, 0, d.w, d.h);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, srcT);
+    gl.uniform1i(glU(glProg.reduce, 'uSrc'), 0);
+    gl.uniform2i(glU(glProg.reduce, 'uSrcSize'), sw, sh);
+    glDrawQuad();
+    srcT = d.t; sw = d.w; sh = d.h;
+  }
+  gpuPending = glReduce.length > 0;
+}
+function gpuReadDmax(){
+  if(!gpuPending) return;
+  var last = glReduce[glReduce.length - 1];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, last.f);
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.FLOAT, glReadBuf);
+  var m = glReadBuf[3];
+  if(!(m > 0)) m = glReadBuf[0];
+  if(m > 0 && isFinite(m)) gpuDmax = m;
+  gpuPending = false;
+}
+
+function gpuToneMap(){
+  gl.disable(gl.BLEND);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, glFbo.tone);
+  gl.viewport(0, 0, outW, outH);
+  gl.useProgram(glProg.tone);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, glTex.acc);
+  gl.uniform1i(glU(glProg.tone, 'uAcc'), 0);
+  gl.uniform1f(glU(glProg.tone, 'uLogInv'), 1 / Math.log(1 + Math.max(1e-6, gpuDmax)));
+  gl.uniform1f(glU(glProg.tone, 'uGammaInv'), 1 / flame.gamma);
+  gl.uniform1f(glU(glProg.tone, 'uVib'), flame.vibrancy);
+  gl.uniform1f(glU(glProg.tone, 'uBright'), flame.brightness);
+  gl.uniform1f(glU(glProg.tone, 'uCut'), flame.sparse);
+  gl.uniform3f(glU(glProg.tone, 'uBg'), flame.background[0], flame.background[1], flame.background[2]);
+  gl.uniform1i(glU(glProg.tone, 'uSS'), SS);
+  glDrawQuad();
+}
+
+function gpuComposite(fadeT, target){
+  gl.disable(gl.BLEND);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target || null);
+  gl.viewport(0, 0, outW, outH);
+  gl.useProgram(glProg.comp);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, glTex.tone);
+  gl.uniform1i(glU(glProg.comp, 'uTone'), 0);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, glTex.fade);
+  gl.uniform1i(glU(glProg.comp, 'uFade'), 1);
+  gl.uniform1f(glU(glProg.comp, 'uFadeT'), fadeT);
+  gl.uniform2f(glU(glProg.comp, 'uSize'), outW, outH);
+  glDrawQuad();
+}
+
+/* freeze the picture on screen so the incoming flame can cross-fade over it */
+function gpuCaptureFade(){
+  if(!glReady || !glTex.tone) return;
+  gpuComposite(1, glFbo.fade);
+}
+
+function gpuRender(dt){
+  gpuFrameNo++;
+  gpuReadDmax();
+  gpuUploadFlame();
+  if(animOn) gpuDecay(Math.max(0.5, Math.min(0.995, anim.trail)));
+  gpuIterate(gpuK);
+  gpuReduce();
+  if(gpuDmax <= 1) gpuReadDmax();   /* first frame after a reset: read now */
+  gpuToneMap();
+  gpuComposite(fadeFrom ? Math.min(1, fadeT) : 1, null);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+/* ---------------------------------------------------------------------
+   MAIN LOOP
+   --------------------------------------------------------------------- */
+var lastFrame = 0, fpsEMA = 60, rateEMA = 0, lastTone = 0, lastStatus = 0;
+
+function frame(ms){
+  requestAnimationFrame(frame);
+  if(exporting) return;
+  if(!gpuOn && !hist) return;
+
+  var dt = lastFrame ? Math.min(0.25, (ms - lastFrame)/1000) : 1/60;
+  if(lastFrame && dt > 0) fpsEMA += (1/dt - fpsEMA) * 0.08;
+  lastFrame = ms;
+
+  if(saver){
+    if(!fadeFrom && (ms - lastNewFlame) / 1000 > settings.interval) nextSaverFlame();
+    if(fadeFrom){
+      fadeT += dt / fadeDur;
+      if(fadeT >= 1){ fadeT = 1; fadeFrom = null; }
+    }
+  } else if(settings.saverAuto && settings.idle > 0 && (ms - lastInput)/1000 > settings.idle){
+    enterSaver();
+  }
+
+  if(gpuOn){
+    if(!paused){
+      if(animOn) stepAnimation(dt);
+      gpuRender(dt);
+      dirtyDisplay = false;
+      /* hold ~55fps by trading rounds per frame, the GPU equivalent of the
+         CPU's sample budget */
+      if(settings.adaptive && dt > 0.005 && dt < 0.2){
+        var kMax = gpuMaxRounds();
+        if(dt > 0.028 && gpuK > 1) gpuK--;                    /* below ~36fps: back off */
+        else if(dt < 0.016 && gpuK < kMax) gpuK++;            /* above ~62fps: push */
+        if(gpuK > kMax) gpuK = kMax;
+      }
+    } else if(dirtyDisplay || fadeFrom){
+      gpuUploadFlame();
+      gpuToneMap();
+      gpuComposite(fadeFrom ? Math.min(1, fadeT) : 1, null);
+      dirtyDisplay = false;
+    }
+    if(dt > 0) rateEMA += (gpuK*GP*GP/dt - rateEMA) * 0.1;
+  } else {
+    var t0 = performance.now(), did = 0;
+    if(!paused){
+      if(animOn) stepAnimation(dt);
+      did = iterate(budgetPts);
+      samplesSinceTone += budgetPts;
+    }
+    var iterMs = performance.now() - t0;
+    if(did >= 0 && dt > 0) rateEMA += (budgetPts/dt - rateEMA) * 0.1;
+
+    if(settings.adaptive && !paused){
+      var f = (animOn ? 22 : 14) / Math.max(0.4, iterMs);
+      budgetPts = Math.round(Math.min(3000000, Math.max(20000,
+                  budgetPts * Math.min(1.3, Math.max(0.75, f)))));
+      settings.budget = Math.round(budgetPts/1000);
+    }
+
+    var wantTone = dirtyDisplay || animOn || (fadeFrom !== null);
+    if(!wantTone && !paused){
+      wantTone = (samplesSinceTone / Math.max(1, totalSamples) > 0.03) || (ms - lastTone > 500);
+    }
+    if(wantTone){
+      toneMap();
+      lastTone = ms; samplesSinceTone = 0; dirtyDisplay = false;
+    }
+  }
+
+  tickRecording();
+
+  /* while animating the handles ride the structure, so they need the
+     frame rate; the readouts do not */
+  if(animOn && !saver && !hideUI) drawOverlay();
+  if(ms - lastStatus > 220){
+    lastStatus = ms;
+    updateStatus();
+    if(!saver && !animOn) drawOverlay();
+  }
+}
+
+function fmtNum(n){
+  if(n >= 1e9) return (n/1e9).toFixed(2) + 'G';
+  if(n >= 1e6) return (n/1e6).toFixed(2) + 'M';
+  if(n >= 1e3) return (n/1e3).toFixed(1) + 'k';
+  return String(Math.round(n));
+}
+function updateStatus(){
+  $('stSamples').textContent = fmtNum(totalSamples);
+  var q = totalSamples / Math.max(1, histW*histH);
+  $('stQual').textContent = q < 10 ? q.toFixed(2) : fmtNum(q);
+  $('stRate').textContent = fmtNum(rateEMA) + '/s';
+  $('stFps').textContent = fpsEMA.toFixed(0);
+  $('oBudget').textContent = settings.budget + 'k';
+  if(gpuOn){ $('oBudget').textContent = (gpuK*GP*GP/1e6).toFixed(1) + 'M/frame'; }
+  else if(settings.adaptive) $('sBudget').value = Math.min(3000, settings.budget);
+}
+
+var toastTimer = 0;
+function toast(msg){
+  var el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ el.classList.remove('show'); }, 1600);
+}
+
+/* ---------------------------------------------------------------------
+   TRANSFORM OVERLAY  -  the unit triangle (0,0)(1,0)(0,1) carried through
+   each affine map, with draggable corners.
+   --------------------------------------------------------------------- */
+var selX = 0;            /* index into flame.xforms, or -1 for the final */
+function selXform(){ return selX < 0 ? flame.final : flame.xforms[selX]; }
+
+/* While animating, the drawn coefficients are the animated ones, so the
+   handles ride along with the structure instead of floating at the pose
+   the flame happens to have at phase zero. */
+function poseCo(idx){
+  var base = idx < 0 ? flame.final.co : (flame.xforms[idx] ? flame.xforms[idx].co : null);
+  if(!base || !animOn || !ca) return base;
+  if(idx < 0) return fCo ? [fCo[0], fCo[1], fCo[2], fCo[3], fCo[4], fCo[5]] : base;
+  var ci = animSlot[idx];
+  if(ci === undefined || ci < 0) return base;
+  var o = ci * 6;
+  return [ca[o], ca[o+1], ca[o+2], ca[o+3], ca[o+4], ca[o+5]];
+}
+
+function triPoints(co){
+  return [ worldToScreen(co[2], co[5]),
+           worldToScreen(co[0]+co[2], co[3]+co[5]),
+           worldToScreen(co[1]+co[2], co[4]+co[5]) ];
+}
+function xformColor(x, alpha){
+  var s = sortedStops();
+  var t = x.color + flame.palOffset; t -= Math.floor(t);
+  if(flame.palReverse) t = 1 - t;
+  var c = sampleStops(s, t);
+  var m = Math.max(c[0], c[1], c[2]);
+  if(m < 0.05) return 'rgba(210,214,222,' + alpha + ')';   /* dark palette entry */
+  var k = 1/m;
+  return 'rgba(' + Math.round(c[0]*k*255) + ',' + Math.round(c[1]*k*255) + ',' +
+         Math.round(c[2]*k*255) + ',' + alpha + ')';
+}
+
+function drawOverlay(){
+  ctxO.clearRect(0, 0, cssW, cssH);
+  if(saver || hideUI) return;
+  var list = [], i;
+  for(i = 0; i < flame.xforms.length; i++) list.push({x:flame.xforms[i], i:i});
+  if(flame.finalEnabled) list.push({x:flame.final, i:-1});
+
+  for(var n = 0; n < list.length; n++){
+    var x = list[n].x, idx = list[n].i, sel = (idx === selX);
+    var p = triPoints(poseCo(idx));
+    var col = xformColor(x, sel ? 0.95 : 0.42);
+    ctxO.lineWidth = sel ? 2 : 1;
+    ctxO.setLineDash(idx < 0 ? [6,4] : []);
+    ctxO.strokeStyle = col;
+    ctxO.beginPath();
+    ctxO.moveTo(p[0][0], p[0][1]);
+    ctxO.lineTo(p[1][0], p[1][1]);
+    ctxO.lineTo(p[2][0], p[2][1]);
+    ctxO.closePath();
+    ctxO.stroke();
+    if(sel){
+      ctxO.fillStyle = xformColor(x, 0.045);
+      ctxO.fill();
+    }
+    ctxO.setLineDash([]);
+    if(!x.enabled && idx >= 0){
+      ctxO.strokeStyle = 'rgba(255,255,255,.25)';
+      ctxO.beginPath();
+      ctxO.moveTo(p[1][0], p[1][1]); ctxO.lineTo(p[2][0], p[2][1]); ctxO.stroke();
+    }
+    var labels = ['O','X','Y'];
+    for(i = 0; i < 3; i++){
+      ctxO.beginPath();
+      ctxO.arc(p[i][0], p[i][1], sel ? 6 : 4, 0, TAU);
+      ctxO.fillStyle = sel ? col : 'rgba(0,0,0,.55)';
+      ctxO.fill();
+      ctxO.strokeStyle = col; ctxO.lineWidth = 1.5; ctxO.stroke();
+      if(sel){
+        ctxO.fillStyle = 'rgba(255,255,255,.85)';
+        ctxO.font = '10px ui-monospace,Menlo,Consolas,monospace';
+        ctxO.textAlign = 'center'; ctxO.textBaseline = 'middle';
+        ctxO.fillText(labels[i], p[i][0], p[i][1] - 13);
+      }
+    }
+    if(sel){
+      ctxO.fillStyle = 'rgba(255,255,255,.7)';
+      ctxO.font = '11px ui-sans-serif,system-ui,sans-serif';
+      ctxO.textAlign = 'left'; ctxO.textBaseline = 'bottom';
+      ctxO.fillText(idx < 0 ? 'final' : ('transform ' + (idx+1)), p[0][0] + 10, p[0][1] - 8);
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------
+   DIRECT MANIPULATION
+   --------------------------------------------------------------------- */
+var drag = null;
+function allTriangles(){
+  var l = [], i;
+  for(i = 0; i < flame.xforms.length; i++) l.push({co:poseCo(i), idx:i});
+  if(flame.finalEnabled) l.push({co:poseCo(-1), idx:-1});
+  return l;
+}
+function hitHandle(mx, my){
+  var l = allTriangles(), modes = ['o','x','y'], i, k, best = null, bd = 13;
+  for(i = l.length - 1; i >= 0; i--){
+    var p = triPoints(l[i].co);
+    for(k = 0; k < 3; k++){
+      var d = Math.hypot(p[k][0]-mx, p[k][1]-my);
+      var bias = (l[i].idx === selX) ? 3 : 0;
+      if(d - bias < bd){ bd = d - bias; best = {mode:modes[k], idx:l[i].idx}; }
+    }
+  }
+  return best;
+}
+function hitTriangle(mx, my){
+  var l = allTriangles(), i;
+  for(i = l.length - 1; i >= 0; i--){
+    var p = triPoints(l[i].co);
+    if(pointInTri(mx, my, p[0], p[1], p[2])) return l[i].idx;
+  }
+  return null;
+}
+function pointInTri(px, py, a, b, c){
+  var d1 = (px-b[0])*(a[1]-b[1]) - (a[0]-b[0])*(py-b[1]);
+  var d2 = (px-c[0])*(b[1]-c[1]) - (b[0]-c[0])*(py-c[1]);
+  var d3 = (px-a[0])*(c[1]-a[1]) - (c[0]-a[0])*(py-a[1]);
+  var neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+  var pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+  return !(neg && pos);
+}
+
+cvO.addEventListener('pointerdown', function(e){
+  poke();
+  if(saver){ exitSaver(); return; }
+  var r = cvO.getBoundingClientRect();
+  var mx = e.clientX - r.left, my = e.clientY - r.top;
+  var hit = hitHandle(mx, my);
+  var idx = hit ? hit.idx : hitTriangle(mx, my);
+  if(idx !== null && idx !== undefined){
+    if(idx === -1 && !flame.finalEnabled) idx = null;
+  }
+  /* Nothing is edited on pointerdown.  A drag only becomes an edit once the
+     pointer has actually travelled - otherwise a click to focus the window,
+     or a mouse that twitches a pixel while clicking, silently rewrites the
+     transform you happened to click near. */
+  if(idx === null || idx === undefined){
+    drag = {mode:'pan', sx:mx, sy:my, armed:false, pre:snapshot()};
+  } else {
+    selX = idx;
+    syncTransformUI();
+    drawOverlay();
+    drag = {mode: hit ? hit.mode : 'move', idx: idx, sx: mx, sy: my, armed: false,
+            pre: snapshot(), shift: e.shiftKey, alt: e.altKey || e.metaKey};
+  }
+  try{ cvO.setPointerCapture(e.pointerId); }catch(err){}
+});
+
+cvO.addEventListener('pointermove', function(e){
+  poke();
+  if(!drag) return;
+  var r = cvO.getBoundingClientRect();
+  var mx = e.clientX - r.left, my = e.clientY - r.top;
+
+  if(!drag.armed){
+    if(Math.hypot(mx - drag.sx, my - drag.sy) < 3) return;   /* dead zone */
+    drag.armed = true;
+    if(drag.mode === 'pan'){
+      pushUndo(drag.pre);
+      drag.cx = flame.view.cx; drag.cy = flame.view.cy;
+    } else {
+      if(animOn){
+        /* editing a moving target is hopeless; bake the pose under the
+           cursor and stop, which leaves every handle exactly where it is */
+        anim.on = false;
+        refreshAnimState();
+        syncUI();
+        toast('Animation stopped - pose kept for editing');
+      }
+      pushUndo(drag.pre);
+      /* capture the starting geometry now, after any bake */
+      var xs0 = drag.idx < 0 ? flame.final : flame.xforms[drag.idx];
+      var w0 = screenToWorld(drag.sx, drag.sy);
+      drag.co = xs0.co.slice();
+      drag.w0 = w0;
+      drag.a0 = Math.atan2(w0[1] - drag.co[5], w0[0] - drag.co[2]);
+      drag.l0 = Math.max(1e-6, Math.hypot(w0[0] - drag.co[2], w0[1] - drag.co[5]));
+    }
+  }
+
+  if(drag.mode === 'pan'){
+    var s = vZoom * Math.min(cssW, cssH) / 2;
+    var ax = (mx - drag.sx)/s, ay = -(my - drag.sy)/s;
+    flame.view.cx = drag.cx - (ax*vcos + ay*vsin);
+    flame.view.cy = drag.cy - (-ax*vsin + ay*vcos);
+    resetAccumulation();
+    return;
+  }
+
+  var w = screenToWorld(mx, my);
+  var x = drag.idx < 0 ? flame.final : flame.xforms[drag.idx];
+  var d = drag.co, ox = d[2], oy = d[5];
+
+  if(drag.mode === 'move' || drag.mode === 'o'){
+    if(drag.mode === 'o'){ x.co[2] = w[0]; x.co[5] = w[1]; }
+    else { x.co[2] = d[2] + (w[0]-drag.w0[0]); x.co[5] = d[5] + (w[1]-drag.w0[1]); }
+  } else if(drag.shift){
+    /* rigid rotation of both basis vectors */
+    var ang = Math.atan2(w[1]-oy, w[0]-ox) - drag.a0;
+    var cs = Math.cos(ang), sn = Math.sin(ang);
+    x.co[0] = d[0]*cs - d[3]*sn; x.co[3] = d[0]*sn + d[3]*cs;
+    x.co[1] = d[1]*cs - d[4]*sn; x.co[4] = d[1]*sn + d[4]*cs;
+  } else if(drag.alt){
+    /* uniform scale of both basis vectors */
+    var k = Math.max(1e-4, Math.hypot(w[0]-ox, w[1]-oy) / drag.l0);
+    x.co[0] = d[0]*k; x.co[3] = d[3]*k; x.co[1] = d[1]*k; x.co[4] = d[4]*k;
+  } else if(drag.mode === 'x'){
+    x.co[0] = w[0] - ox; x.co[3] = w[1] - oy;
+  } else {
+    x.co[1] = w[0] - ox; x.co[4] = w[1] - oy;
+  }
+  syncAffineFields();
+  paramChanged();
+});
+
+function endDrag(e){
+  if(!drag) return;
+  var was = drag.armed;
+  drag = null;
+  try{ cvO.releasePointerCapture(e.pointerId); }catch(err){}
+  if(was) lastCommitted = snapshot();
+}
+cvO.addEventListener('pointerup', endDrag);
+cvO.addEventListener('pointercancel', endDrag);
+
+cvO.addEventListener('wheel', function(e){
+  e.preventDefault();
+  poke();
+  if(saver){ exitSaver(); return; }
+  var r = cvO.getBoundingClientRect();
+  var mx = e.clientX - r.left, my = e.clientY - r.top;
+  var before = screenToWorld(mx, my);
+  flame.view.zoom = Math.max(0.005, Math.min(600, flame.view.zoom * Math.exp(-e.deltaY * 0.0016)));
+  updateView();
+  var after = screenToWorld(mx, my);
+  flame.view.cx += before[0] - after[0];
+  flame.view.cy += before[1] - after[1];
+  resetAccumulation();
+}, {passive:false});
+
+/* ---------------------------------------------------------------------
+   PARAMETER EDITOR UI
+   --------------------------------------------------------------------- */
+var affInputs = [], varRows = [], varSliders = [], varOuts = [], showActiveOnly = false;
+var AFFN = ['a','b','c','d','e','f'];
+
+function buildAffine(){
+  var wrap = $('affine'), i;
+  wrap.innerHTML = '';
+  affInputs = [];
+  for(i = 0; i < 6; i++){
+    var lab = document.createElement('label');
+    var sp = document.createElement('span'); sp.textContent = AFFN[i];
+    var inp = document.createElement('input');
+    inp.type = 'number'; inp.step = '0.01';
+    lab.appendChild(sp); lab.appendChild(inp);
+    wrap.appendChild(lab);
+    affInputs.push(inp);
+    (function(k){
+      inp.addEventListener('input', function(){
+        var v = parseFloat(inp.value);
+        if(!isFinite(v)) return;
+        selXform().co[k] = v;
+        paramChanged();
+      });
+      inp.addEventListener('change', function(){ commit(); });
+      inp.addEventListener('focus', function(){ lastCommitted = snapshot(); });
+    })(i);
+  }
+}
+
+function buildVariationList(){
+  var wrap = $('vlist'), i;
+  wrap.innerHTML = '';
+  varRows = []; varSliders = []; varOuts = [];
+  for(i = 0; i < NV; i++){
+    var row = document.createElement('div'); row.className = 'vrow';
+    var lab = document.createElement('label'); lab.textContent = VARS[i].name;
+    var sl = document.createElement('input');
+    sl.type = 'range'; sl.min = '-1'; sl.max = '1.5'; sl.step = '0.01'; sl.value = '0';
+    var out = document.createElement('output'); out.textContent = '0';
+    row.appendChild(lab); row.appendChild(sl); row.appendChild(out);
+    wrap.appendChild(row);
+    varRows.push(row); varSliders.push(sl); varOuts.push(out);
+    (function(k, slider, o, r){
+      slider.addEventListener('input', function(){
+        var v = parseFloat(slider.value);
+        selXform().v[k] = v;
+        o.textContent = v.toFixed(2);
+        r.classList.toggle('act', v !== 0);
+        paramChanged();
+      });
+      slider.addEventListener('pointerdown', function(){ lastCommitted = snapshot(); });
+      slider.addEventListener('change', function(){ commit(); });
+    })(i, sl, out, row);
+  }
+}
+
+function buildTabs(){
+  var wrap = $('xtabs'), i;
+  wrap.innerHTML = '';
+  function tab(label, idx, dis){
+    var b = document.createElement('button');
+    b.textContent = label;
+    if(idx === selX) b.classList.add('on');
+    if(dis) b.classList.add('off');
+    b.addEventListener('click', function(){ selX = idx; syncTransformUI(); drawOverlay(); });
+    wrap.appendChild(b);
+  }
+  for(i = 0; i < flame.xforms.length; i++) tab(String(i+1), i, !flame.xforms[i].enabled);
+  if(flame.finalEnabled) tab('F', -1, false);
+}
+
+function syncAffineFields(){
+  var co = selXform().co, i;
+  for(i = 0; i < 6; i++){
+    if(document.activeElement !== affInputs[i]) affInputs[i].value = co[i].toFixed(4);
+  }
+}
+
+function syncTransformUI(){
+  if(selX >= flame.xforms.length) selX = flame.xforms.length - 1;
+  if(selX < -1) selX = 0;
+  if(selX === -1 && !flame.finalEnabled) selX = 0;
+  var x = selXform(), i;
+  buildTabs();
+  syncAffineFields();
+  $('sXw').value = Math.min(3, x.weight); $('oXw').textContent = x.weight.toFixed(2);
+  $('sXc').value = x.color; $('oXc').textContent = x.color.toFixed(3);
+  $('sXw').disabled = (selX === -1);
+  $('bDelX').disabled = (selX === -1) || flame.xforms.length <= 2;
+  $('bTogX').disabled = (selX === -1);
+  $('bTogX').textContent = (selX >= 0 && !x.enabled) ? 'Enable' : 'Disable';
+  $('bTogX').classList.toggle('on', selX >= 0 && !x.enabled);
+  $('bAddX').disabled = flame.xforms.length >= 6;
+  for(i = 0; i < NV; i++){
+    var v = x.v[i] || 0;
+    varSliders[i].value = v;
+    varOuts[i].textContent = v.toFixed(2);
+    varRows[i].classList.toggle('act', v !== 0);
+    varRows[i].style.display = (showActiveOnly && v === 0) ? 'none' : '';
+  }
+}
+
+function syncUI(){
+  $('sVib').value = flame.vibrancy;      $('oVib').textContent = flame.vibrancy.toFixed(2);
+  $('sGamma').value = flame.gamma;       $('oGamma').textContent = flame.gamma.toFixed(2);
+  $('sBright').value = flame.brightness; $('oBright').textContent = flame.brightness.toFixed(2);
+  $('sSparse').value = flame.sparse;     $('oSparse').textContent = flame.sparse.toFixed(2);
+  $('cBg').value = rgb2hex(flame.background);
+  $('kTrans').checked = flame.transparentBg;
+  $('selPal').value = String(flame.palIndex);
+  $('sPalOff').value = flame.palOffset;  $('oPalOff').textContent = flame.palOffset.toFixed(2);
+  $('kPalRev').checked = flame.palReverse;
+  $('kFinal').checked = flame.finalEnabled;
+  $('kSaverAuto').checked = settings.saverAuto;
+  $('sIdle').value = settings.idle;       $('oIdle').textContent = settings.idle + 's';
+  $('sInterval').value = settings.interval; $('oInterval').textContent = settings.interval + 's';
+  $('sFade').value = settings.fade;       $('oFade').textContent = settings.fade.toFixed(1) + 's';
+  $('sLoop').value = anim.loop;           $('oLoop').textContent = Math.round(anim.loop) + 's';
+  $('sRot').value = anim.rotate;          $('oRot').textContent = String(anim.rotate);
+  $('sPulse').value = anim.pulse;         $('oPulse').textContent = anim.pulse.toFixed(2);
+  $('sDrift').value = anim.drift;         $('oDrift').textContent = anim.drift.toFixed(2);
+  $('sMorph').value = anim.morph;         $('oMorph').textContent = anim.morph.toFixed(2);
+  $('sCam').value = anim.camera;          $('oCam').textContent = anim.camera.toFixed(2);
+  $('sPalT').value = anim.palette;        $('oPalT').textContent = String(anim.palette);
+  $('sTrail').value = anim.trail;         $('oTrail').textContent = anim.trail.toFixed(3);
+  $('bAnim').classList.toggle('on', anim.on);
+  $('bAnim').textContent = anim.on ? 'Stop  A' : 'Animate  A';
+  $('bRec').disabled = recording;
+  $('bRec').textContent = recording ? 'Recording' : 'Record loop';
+  $('kSaverMut').checked = settings.saverMutate;
+  $('kSaverKeep').checked = settings.saverKeep;
+  $('sScale').value = settings.renderScale; $('oScale').textContent = Math.round(settings.renderScale*100) + '%';
+  $('kSS').checked = settings.ss === 2;
+  $('selRend').value = settings.renderer;
+  $('oRend').textContent = gpuOn ? 'GPU' : 'CPU';
+  $('kAdapt').checked = settings.adaptive;
+  $('sBudget').disabled = settings.adaptive || gpuOn;
+  $('kStore').checked = settings.store;
+  $('selMult').value = String(settings.pngMult);
+  $('bPause').classList.toggle('on', paused);
+  $('bPause').textContent = paused ? 'Resume' : 'Pause';
+  $('bSaver').classList.toggle('on', saver);
+  $('bVfilter').classList.toggle('on', showActiveOnly);
+  updateMultLabel();
+  syncTransformUI();
+  refreshUndoButtons();
+}
+function updateMultLabel(){
+  var m = settings.pngMult;
+  $('oMult').textContent = (outW*m) + '×' + (outH*m);
+}
+
+/* ---------------------------------------------------------------------
+   PALETTE EDITOR
+   The upper strip is the gradient as authored, with the stop handles
+   lined up under it; the lower strip is the palette actually in use,
+   after rotation and reverse.
+   --------------------------------------------------------------------- */
+var selStop = 0;
+function drawPalBar(){
+  var c = $('palbar');
+  var w = Math.max(40, c.clientWidth), h = 34;
+  var dp = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = Math.round(w*dp); c.height = Math.round(h*dp);
+  var g = c.getContext('2d');
+  g.setTransform(dp, 0, 0, dp, 0, 0);
+  var s = sortedStops(), i, col;
+  for(i = 0; i < w; i++){
+    col = sampleStops(s, i/(w-1));
+    g.fillStyle = rgb2hex(col);
+    g.fillRect(i, 0, 1.5, 21);
+  }
+  g.fillStyle = 'rgba(255,255,255,.18)';
+  g.fillRect(0, 21, w, 1);
+  for(i = 0; i < w; i++){
+    var t = Math.min(255, Math.round(i/(w-1)*255));
+    g.fillStyle = 'rgb(' + Math.round(palR[t]*255) + ',' + Math.round(palG[t]*255) + ',' + Math.round(palB[t]*255) + ')';
+    g.fillRect(i, 22, 1.5, 12);
+  }
+}
+
+function buildPaletteEditor(){
+  var wrap = $('palstops');
+  wrap.innerHTML = '';
+  var s = flame.palStops, i;
+  if(selStop >= s.length) selStop = s.length - 1;
+  for(i = 0; i < s.length; i++){
+    (function(k){
+      var d = document.createElement('div');
+      d.className = 'stop' + (k === selStop ? ' sel' : '');
+      d.style.left = (s[k].p*100) + '%';
+      d.style.background = rgb2hex(s[k].c);
+      d.addEventListener('pointerdown', function(e){
+        e.stopPropagation();
+        e.preventDefault();
+        lastCommitted = snapshot();
+        selStop = k;
+        buildPaletteEditor();
+        syncStopEditor();
+        var rect = wrap.getBoundingClientRect();
+        function mv(ev){
+          var p = Math.min(1, Math.max(0, (ev.clientX - rect.left)/Math.max(1, rect.width)));
+          flame.palStops[k].p = p;
+          d.style.left = (p*100) + '%';
+          $('stopPos').value = p.toFixed(3);
+          flame.palIndex = -1; $('selPal').value = '-1';
+          recolour(); drawPalBar();
+        }
+        function up(){
+          window.removeEventListener('pointermove', mv);
+          window.removeEventListener('pointerup', up);
+          commit();
+        }
+        window.addEventListener('pointermove', mv);
+        window.addEventListener('pointerup', up);
+      });
+      wrap.appendChild(d);
+    })(i);
+  }
+  drawPalBar();
+  syncStopEditor();
+}
+
+function syncStopEditor(){
+  var s = flame.palStops;
+  if(!s.length) return;
+  if(selStop >= s.length) selStop = 0;
+  $('stopColor').value = rgb2hex(s[selStop].c);
+  $('stopPos').value = s[selStop].p.toFixed(3);
+  $('stopDel').disabled = s.length <= 2;
+  $('palNote').textContent = s.length + ' stops · click the bar to add one, drag to move, ✕ to delete.';
+}
+
+$('palbar').addEventListener('pointerdown', function(e){
+  var r = $('palbar').getBoundingClientRect();
+  var p = Math.min(1, Math.max(0, (e.clientX - r.left)/Math.max(1, r.width)));
+  commit();
+  var c = sampleStops(sortedStops(), p);
+  flame.palStops.push({p:p, c:c});
+  flame.palStops.sort(function(a,b){ return a.p - b.p; });
+  var i;
+  for(i = 0; i < flame.palStops.length; i++) if(flame.palStops[i].p === p){ selStop = i; break; }
+  flame.palIndex = -1; $('selPal').value = '-1';
+  recolour();
+  buildPaletteEditor();
+  commit();
+});
+$('stopColor').addEventListener('input', function(){
+  flame.palStops[selStop].c = hex2rgb($('stopColor').value);
+  flame.palIndex = -1; $('selPal').value = '-1';
+  recolour(); buildPaletteEditor();
+});
+$('stopColor').addEventListener('change', function(){ commit(); });
+$('stopColor').addEventListener('focus', function(){ lastCommitted = snapshot(); });
+$('stopPos').addEventListener('input', function(){
+  var v = parseFloat($('stopPos').value);
+  if(!isFinite(v)) return;
+  flame.palStops[selStop].p = Math.min(1, Math.max(0, v));
+  flame.palIndex = -1; $('selPal').value = '-1';
+  recolour(); buildPaletteEditor();
+});
+$('stopDel').addEventListener('click', function(){
+  if(flame.palStops.length <= 2) return;
+  commit();
+  flame.palStops.splice(selStop, 1);
+  selStop = Math.max(0, selStop - 1);
+  flame.palIndex = -1; $('selPal').value = '-1';
+  recolour(); buildPaletteEditor(); commit();
+});
+
+/* ---------------------------------------------------------------------
+   CONTROL WIRING
+   --------------------------------------------------------------------- */
+function poke(){ lastInput = performance.now(); }
+function bindSlider(sid, oid, setter, fmt, after){
+  var s = $(sid), o = $(oid);
+  s.addEventListener('pointerdown', function(){ lastCommitted = snapshot(); });
+  s.addEventListener('input', function(){
+    var v = parseFloat(s.value);
+    setter(v);
+    o.textContent = fmt(v);
+    after();
+  });
+  s.addEventListener('change', function(){ commit(); saveSoon(); });
+}
+function f2(v){ return v.toFixed(2); }
+function f3(v){ return v.toFixed(3); }
+function fs(v){ return Math.round(v) + 's'; }
+
+bindSlider('sVib','oVib', function(v){ flame.vibrancy = v; }, f2, displayChanged);
+bindSlider('sGamma','oGamma', function(v){ flame.gamma = v; }, f2, displayChanged);
+bindSlider('sBright','oBright', function(v){ flame.brightness = v; }, f2, displayChanged);
+bindSlider('sSparse','oSparse', function(v){ flame.sparse = v; }, f2, displayChanged);
+bindSlider('sPalOff','oPalOff', function(v){ flame.palOffset = v; }, f2, function(){ recolour(); drawPalBar(); });
+bindSlider('sIdle','oIdle', function(v){ settings.idle = v; }, fs, function(){});
+bindSlider('sInterval','oInterval', function(v){ settings.interval = v; }, fs, function(){});
+bindSlider('sFade','oFade', function(v){ settings.fade = v; }, function(v){ return v.toFixed(1)+'s'; }, function(){});
+bindSlider('sLoop','oLoop',   function(v){ anim.loop = v; },   function(v){ return Math.round(v)+'s'; }, function(){});
+bindSlider('sRot','oRot',     function(v){ anim.rotate = v; }, function(v){ return String(Math.round(v)); }, function(){});
+bindSlider('sPulse','oPulse', function(v){ anim.pulse = v; },  f2, function(){});
+bindSlider('sDrift','oDrift', function(v){ anim.drift = v; },  f2, function(){});
+bindSlider('sMorph','oMorph', function(v){ anim.morph = v; },  f2, function(){});
+bindSlider('sCam','oCam',     function(v){ anim.camera = v; }, f2, function(){});
+bindSlider('sPalT','oPalT',   function(v){ anim.palette = v; },function(v){ return String(Math.round(v)); }, function(){});
+bindSlider('sTrail','oTrail', function(v){ anim.trail = v; },  f3, function(){});
+bindSlider('sXw','oXw', function(v){ if(selX >= 0) selXform().weight = v; }, f2, paramChanged);
+bindSlider('sXc','oXc', function(v){ selXform().color = v; }, f3, function(){ paramChanged(); drawOverlay(); });
+bindSlider('sScale','oScale', function(v){ settings.renderScale = v; },
+           function(v){ return Math.round(v*100)+'%'; },
+           function(){ allocate(); updateMultLabel(); });
+bindSlider('sBudget','oBudget', function(v){ settings.budget = v; budgetPts = v*1000; },
+           function(v){ return Math.round(v)+'k'; }, function(){});
+
+$('cBg').addEventListener('input', function(){
+  flame.background = hex2rgb($('cBg').value);
+  displayChanged();
+});
+$('cBg').addEventListener('change', function(){ commit(); saveSoon(); });
+$('cBg').addEventListener('focus', function(){ lastCommitted = snapshot(); });
+$('kTrans').addEventListener('change', function(){ flame.transparentBg = $('kTrans').checked; saveSoon(); });
+$('kPalRev').addEventListener('change', function(){
+  commit(); flame.palReverse = $('kPalRev').checked; recolour(); drawPalBar(); saveSoon();
+});
+$('kSaverAuto').addEventListener('change', function(){ settings.saverAuto = $('kSaverAuto').checked; saveSoon(); });
+$('kSaverMut').addEventListener('change', function(){ settings.saverMutate = $('kSaverMut').checked; saveSoon(); });
+$('kSaverKeep').addEventListener('change', function(){ settings.saverKeep = $('kSaverKeep').checked; saveSoon(); });
+$('kAdapt').addEventListener('change', function(){
+  settings.adaptive = $('kAdapt').checked; $('sBudget').disabled = settings.adaptive; saveSoon();
+});
+$('selRend').addEventListener('change', function(){
+  var want = $('selRend').value;
+  if(want === settings.renderer) return;
+  settings.renderer = want;
+  gpuWhy = '';
+  if(want === 'cpu'){
+    /* dropping to the CPU is clean: the GL objects are simply left alone */
+    allocate(); updateMultLabel(); syncUI(); saveSoon();
+    toast('CPU renderer');
+    return;
+  }
+  /* Going the other way is not.  Re-initialising WebGL in place leaves the
+     iterate pass silently not accumulating - a bug I have not pinned down -
+     so this direction takes a clean restart instead of a half-working
+     pipeline.  The flame and settings are handed across, whether or not
+     the user asked for them to be remembered. */
+  try{
+    sessionStorage.setItem(HANDOFF, JSON.stringify({flame:flame, settings:settings, anim:anim}));
+  }catch(e){}
+  toast('Restarting on the GPU…');
+  setTimeout(function(){ try{ location.reload(); }catch(e){} }, 350);
+});
+$('kSS').addEventListener('change', function(){
+  settings.ss = $('kSS').checked ? 2 : 1; allocate(); updateMultLabel(); saveSoon();
+});
+$('kStore').addEventListener('change', function(){
+  settings.store = $('kStore').checked;
+  if(!settings.store){ try{ localStorage.removeItem(STORE_KEY); }catch(e){} } else saveSoon();
+});
+$('kFinal').addEventListener('change', function(){
+  commit();
+  flame.finalEnabled = $('kFinal').checked;
+  if(!flame.finalEnabled && selX === -1) selX = 0;
+  paramChanged(); syncTransformUI(); drawOverlay(); saveSoon();
+});
+$('selPal').addEventListener('change', function(){
+  var v = parseInt($('selPal').value, 10);
+  if(v < 0) return;
+  commit();
+  flame.palIndex = v;
+  flame.palStops = paletteStops(v);
+  selStop = 0;
+  recolour(); buildPaletteEditor(); commit(); saveSoon();
+});
+$('selPreset').addEventListener('change', function(){
+  var v = parseInt($('selPreset').value, 10);
+  $('selPreset').value = '-1';
+  if(v >= 0) applyPreset(v);
+});
+$('selMult').addEventListener('change', function(){
+  settings.pngMult = parseInt($('selMult').value, 10); updateMultLabel(); saveSoon();
+});
+
+$('bRandom').addEventListener('click', function(){ commit(); randomize(); syncUI(); buildPaletteEditor(); saveSoon(); toast('New flame'); });
+$('bMutate').addEventListener('click', function(){ commit(); mutateFlame(1); syncUI(); buildPaletteEditor(); saveSoon(); toast('Mutated'); });
+$('bPause').addEventListener('click', function(){ paused = !paused; syncUI(); });
+$('bFit').addEventListener('click', function(){ commit(); autoFit(); toast('Framed'); });
+$('bSaver').addEventListener('click', function(){ if(saver) exitSaver(); else enterSaver(); syncUI(); });
+$('bFull').addEventListener('click', toggleFullscreen);
+$('bAnim').addEventListener('click', function(){ toggleAnimate(); });
+$('bRec').addEventListener('click', recordLoop);
+$('bHide').addEventListener('click', function(){ hideUI = true; document.body.classList.add('hideui'); drawOverlay(); });
+$('bUndo').addEventListener('click', undo);
+$('bRedo').addEventListener('click', redo);
+
+$('bAddX').addEventListener('click', function(){
+  if(flame.xforms.length >= 6) return;
+  commit();
+  flame.xforms.push(mkXform(randomAffine(), {0:1}, 0.5, Math.random()));
+  selX = flame.xforms.length - 1;
+  paramChanged(); syncTransformUI(); drawOverlay(); commit();
+});
+$('bDelX').addEventListener('click', function(){
+  if(selX < 0 || flame.xforms.length <= 2) return;
+  commit();
+  flame.xforms.splice(selX, 1);
+  selX = Math.max(0, selX - 1);
+  paramChanged(); syncTransformUI(); drawOverlay(); commit();
+});
+$('bTogX').addEventListener('click', function(){
+  if(selX < 0) return;
+  commit();
+  selXform().enabled = !selXform().enabled;
+  paramChanged(); syncTransformUI(); drawOverlay(); commit();
+});
+$('bXreset').addEventListener('click', function(){
+  commit(); selXform().co = [1,0,0,0,1,0];
+  syncAffineFields(); paramChanged(); commit();
+});
+function rotateSel(deg){
+  commit();
+  var co = selXform().co, a = deg*PI/180, cs = Math.cos(a), sn = Math.sin(a);
+  var A = co[0], B = co[1], D = co[3], E = co[4];
+  co[0] = cs*A - sn*D; co[3] = sn*A + cs*D;
+  co[1] = cs*B - sn*E; co[4] = sn*B + cs*E;
+  syncAffineFields(); paramChanged(); commit();
+}
+$('bXrotL').addEventListener('click', function(){ rotateSel(-15); });
+$('bXrotR').addEventListener('click', function(){ rotateSel(15); });
+$('bXscale').addEventListener('click', function(){
+  commit();
+  var co = selXform().co, i;
+  for(i = 0; i < 6; i++) if(i !== 2 && i !== 5) co[i] *= 0.9;
+  syncAffineFields(); paramChanged(); commit();
+});
+$('bVfilter').addEventListener('click', function(){
+  showActiveOnly = !showActiveOnly;
+  $('bVfilter').classList.toggle('on', showActiveOnly);
+  syncTransformUI();
+});
+$('bVclear').addEventListener('click', function(){
+  commit();
+  var x = selXform(), i;
+  for(i = 0; i < NV; i++) x.v[i] = 0;
+  x.v[0] = 1;
+  paramChanged(); syncTransformUI(); commit();
+});
+
+/* ---------------------------------------------------------------------
+   IMPORT / EXPORT OF PARAMETERS
+   --------------------------------------------------------------------- */
+function normalizeFlame(f){
+  if(!f || typeof f !== 'object') throw new Error('not an object');
+  if(!Array.isArray(f.xforms) || f.xforms.length < 1) throw new Error('no transforms');
+  var out = defaultFlame(), i, k;
+  out.xforms = [];
+  for(i = 0; i < Math.min(6, f.xforms.length); i++){
+    var s = f.xforms[i] || {};
+    var x = mkXform([1,0,0,0,1,0], {}, 1, 0.5);
+    if(Array.isArray(s.co)) for(k = 0; k < 6; k++) x.co[k] = num(s.co[k], x.co[k]);
+    if(Array.isArray(s.v)) for(k = 0; k < Math.min(NV, s.v.length); k++) x.v[k] = num(s.v[k], 0);
+    x.weight = Math.max(0.001, num(s.weight, 1));
+    x.color = Math.min(1, Math.max(0, num(s.color, 0.5)));
+    x.enabled = s.enabled !== false;
+    out.xforms.push(x);
+  }
+  while(out.xforms.length < 2) out.xforms.push(mkXform(randomAffine(), {0:1}, 0.5, Math.random()));
+  out.finalEnabled = !!f.finalEnabled;
+  if(f.final && Array.isArray(f.final.co)){
+    var fx = mkXform([1,0,0,0,1,0], {}, 1, 0.5);
+    for(k = 0; k < 6; k++) fx.co[k] = num(f.final.co[k], fx.co[k]);
+    if(Array.isArray(f.final.v)) for(k = 0; k < Math.min(NV, f.final.v.length); k++) fx.v[k] = num(f.final.v[k], 0);
+    fx.color = Math.min(1, Math.max(0, num(f.final.color, 0.5)));
+    out.final = fx;
+  }
+  if(Array.isArray(f.palStops) && f.palStops.length >= 2){
+    out.palStops = [];
+    for(i = 0; i < f.palStops.length; i++){
+      var st = f.palStops[i];
+      if(!st || !Array.isArray(st.c)) continue;
+      out.palStops.push({p: Math.min(1, Math.max(0, num(st.p, 0))),
+                         c: [clamp01(num(st.c[0],0)), clamp01(num(st.c[1],0)), clamp01(num(st.c[2],0))]});
+    }
+    if(out.palStops.length < 2) out.palStops = paletteStops(0);
+  }
+  out.palIndex = (typeof f.palIndex === 'number' && f.palIndex >= -1 && f.palIndex < PALETTES.length) ? f.palIndex : -1;
+  out.palOffset = clamp01(num(f.palOffset, 0));
+  out.palReverse = !!f.palReverse;
+  if(Array.isArray(f.background)) out.background = [clamp01(num(f.background[0],0)), clamp01(num(f.background[1],0)), clamp01(num(f.background[2],0))];
+  out.transparentBg = !!f.transparentBg;
+  out.gamma = Math.min(4, Math.max(0.5, num(f.gamma, 2.2)));
+  out.brightness = Math.min(6, Math.max(0.1, num(f.brightness, 1.6)));
+  out.vibrancy = clamp01(num(f.vibrancy, 0.7));
+  out.sparse = Math.min(8, Math.max(0, num(f.sparse, 1.2)));
+  if(f.view){
+    out.view = {cx:num(f.view.cx,0), cy:num(f.view.cy,0),
+                zoom:Math.max(0.005, Math.min(600, num(f.view.zoom, 0.42))), rot:num(f.view.rot,0)};
+  }
+  return out;
+}
+function num(v, d){ return (typeof v === 'number' && isFinite(v)) ? v : d; }
+function clamp01(v){ return v < 0 ? 0 : (v > 1 ? 1 : v); }
+
+$('bDump').addEventListener('click', function(){
+  $('json').value = JSON.stringify(flame, null, 1);
+  toast('Exported to the box');
+});
+$('bCopyJson').addEventListener('click', function(){
+  var t = $('json');
+  if(!t.value) t.value = JSON.stringify(flame, null, 1);
+  t.select();
+  var ok = false;
+  try{ ok = document.execCommand('copy'); }catch(e){ ok = false; }
+  if(!ok && navigator.clipboard){
+    navigator.clipboard.writeText(t.value).then(function(){ toast('Copied'); },
+      function(){ toast('Select the text and copy manually'); });
+    return;
+  }
+  toast(ok ? 'Copied to clipboard' : 'Select the text and copy manually');
+});
+$('bLoad').addEventListener('click', function(){
+  try{
+    var f = normalizeFlame(JSON.parse($('json').value));
+    commit();
+    flame = f;
+    selX = 0; selStop = 0;
+    compile(); resetAccumulation();
+    syncUI(); buildPaletteEditor(); commit(); saveSoon();
+    toast('Imported');
+  }catch(err){ toast('Could not read that JSON: ' + err.message); }
+});
+$('bDefault').addEventListener('click', function(){
+  commit();
+  flame = defaultFlame();
+  selX = 0; selStop = 0;
+  compile(); autoFit(); syncUI(); buildPaletteEditor(); commit(); saveSoon();
+  toast('Reset to the default flame');
+});
+
+/* ---------------------------------------------------------------------
+   PNG EXPORT  -  re-accumulates at the target size rather than scaling
+   the screen image up, so a 4x print is genuinely 4x the detail.
+   --------------------------------------------------------------------- */
+var exporting = false;
+var MAX_EXPORT_CELLS = 8000000;
+
+function showBusy(title, msg){
+  $('busyTitle').textContent = title;
+  $('busyMsg').textContent = msg;
+  $('barfill').style.width = '0%';
+  $('busy').classList.add('on');
+}
+function hideBusy(){ $('busy').classList.remove('on'); }
+function setProgress(p){ $('barfill').style.width = Math.round(p*100) + '%'; }
+
+function downloadBlob(blob, name){
+  try{
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); if(a.parentNode) a.parentNode.removeChild(a); }, 5000);
+  }catch(e){ toast('The browser blocked the download'); }
+}
+
+function exportPNG(){
+  if(exporting) return;
+  var m = settings.pngMult;
+  var w = Math.max(16, Math.round(outW*m)), h = Math.max(16, Math.round(outH*m));
+  if(w*h > MAX_EXPORT_CELLS){
+    var k = Math.sqrt(MAX_EXPORT_CELLS/(w*h));
+    w = Math.round(w*k); h = Math.round(h*k);
+  }
+  var cells = w*h, H, R, G, B, C;
+  try{
+    H = new Float32Array(cells); R = new Float32Array(cells);
+    G = new Float32Array(cells); B = new Float32Array(cells); C = new Float32Array(cells);
+  }catch(err){ toast('Not enough memory for ' + w + '×' + h); return; }
+
+  var save = {hist:hist, hr:hr, hg:hg, hb:hb, hc:hc, hw:histW, hh:histH, ss:SS,
+              dmax:dmax, accW:accWeight, total:totalSamples,
+              x:stX, y:stY, c:stC, fuse:stFuse};
+  hist = H; hr = R; hg = G; hb = B; hc = C;
+  histW = w; histH = h; SS = 1; dmax = 0; accWeight = 1; totalSamples = 0;
+  updateView(); reseedPoint();
+
+  var target = Math.round(cells * 30), done = 0, cancelled = false;
+  exporting = true;
+  showBusy('Rendering PNG', w + '×' + h + ' · ' + fmtNum(target) + ' samples');
+  $('busyCancel').onclick = function(){ cancelled = true; };
+
+  function restore(){
+    hist = save.hist; hr = save.hr; hg = save.hg; hb = save.hb; hc = save.hc;
+    histW = save.hw; histH = save.hh; SS = save.ss;
+    dmax = save.dmax; accWeight = save.accW; totalSamples = save.total;
+    stX = save.x; stY = save.y; stC = save.c; stFuse = save.fuse;
+    updateView();
+    exporting = false;
+    hideBusy();
+    dirtyDisplay = true;
+  }
+
+  function step(){
+    if(cancelled){ restore(); toast('Export cancelled'); return; }
+    var t0 = performance.now();
+    while(performance.now() - t0 < 26 && done < target){
+      var n = Math.min(300000, target - done);
+      iterate(n);
+      done += n;
+    }
+    setProgress(done/target);
+    $('busyMsg').textContent = w + '×' + h + ' · ' + fmtNum(done) + ' / ' + fmtNum(target) + ' samples';
+    if(done < target){ requestAnimationFrame(step); return; }
+    var cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    var cx = cv.getContext('2d');
+    var id = cx.createImageData(w, h);
+    toneMapTo(H, R, G, B, w, h, id.data, flame.transparentBg);
+    cx.putImageData(id, 0, 0);
+    if(cv.toBlob){
+      cv.toBlob(function(blob){
+        if(blob) downloadBlob(blob, 'flame-' + Date.now() + '.png');
+        else toast('PNG encoding failed');
+        restore();
+      }, 'image/png');
+    } else {
+      downloadDataURL(cv.toDataURL('image/png'));
+      restore();
+    }
+  }
+  requestAnimationFrame(step);
+}
+function downloadDataURL(url){
+  var a = document.createElement('a');
+  a.href = url; a.download = 'flame-' + Date.now() + '.png';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ if(a.parentNode) a.parentNode.removeChild(a); }, 3000);
+}
+$('bPng').addEventListener('click', exportPNG);
+
+
+/* ---------------------------------------------------------------------
+   ANIMATION CONTROL AND WEBM RECORDING
+   captureStream reads the flame canvas only - the control panel and the
+   transform overlay live on other elements, so the recording is clean
+   even while the busy dialog is up.
+   --------------------------------------------------------------------- */
+function toggleAnimate(){
+  anim.on = !anim.on;
+  refreshAnimState();
+  syncUI();
+  drawOverlay();
+  saveSoon();
+  toast(anim.on ? ('Animating - ' + Math.round(anim.loop) + 's loop') : 'Stopped; pose kept');
+}
+
+var recording = false, recStop = 0, recorder = null, recStream = null;
+
+function pickRecMime(){
+  var c = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'], i;
+  if(typeof MediaRecorder === 'undefined') return '';
+  for(i = 0; i < c.length; i++){
+    if(!MediaRecorder.isTypeSupported || MediaRecorder.isTypeSupported(c[i])) return c[i];
+  }
+  return '';
+}
+
+function recordLoop(){
+  if(recording || exporting) return;
+  var mime = pickRecMime();
+  var rc = activeCanvas();
+  if(!mime || !rc.captureStream){ toast('This browser cannot record video'); return; }
+  try{ recStream = rc.captureStream(30); }
+  catch(e){ toast('Canvas capture unavailable: ' + e.message); return; }
+
+  var chunks = [];
+  try{
+    recorder = new MediaRecorder(recStream, {mimeType: mime, videoBitsPerSecond: 16000000});
+  }catch(e){ toast('Recorder failed: ' + e.message); stopRecStream(); return; }
+
+  recorder.ondataavailable = function(e){ if(e.data && e.data.size) chunks.push(e.data); };
+  recorder.onstop = function(){
+    stopRecStream();
+    recording = false; recorder = null;
+    hideBusy();
+    if(chunks.length){
+      downloadBlob(new Blob(chunks, {type: mime}), 'flame-' + Date.now() + '.webm');
+      toast('Saved a ' + Math.round(anim.loop) + 's seamless loop');
+    } else {
+      toast('Nothing was recorded');
+    }
+    syncUI();
+  };
+
+  /* start at phase zero so the last frame lands exactly on the first */
+  if(!anim.on){ anim.on = true; refreshAnimState(); }
+  animPhase = 0;
+  accWeight = 1;
+  resetAccumulation();
+  applyAnimation();
+  /* fill the histogram before the first frame is captured, or the clip
+     opens on a cloud of noise */
+  if(gpuOn){ gpuUploadFlame(); gpuIterate(12); gpuReduce(); gpuReadDmax(); gpuToneMap();
+             gpuComposite(1, null); }
+  else { iterate(Math.min(2500000, histW * histH * 4)); toneMap(); }
+
+  recording = true;
+  recStop = performance.now() + Math.max(1, anim.loop) * 1000;
+  showBusy('Recording ' + outW + '×' + outH,
+           'one ' + Math.round(anim.loop) + 's loop at 30fps - it will loop seamlessly');
+  $('busyCancel').onclick = function(){ recStop = 0; };
+  try{ recorder.start(200); }
+  catch(e){ recording = false; hideBusy(); stopRecStream(); toast('Recorder failed to start'); return; }
+  syncUI();
+}
+
+function stopRecStream(){
+  if(!recStream) return;
+  try{
+    var t = recStream.getTracks(), i;
+    for(i = 0; i < t.length; i++) t[i].stop();
+  }catch(e){}
+  recStream = null;
+}
+
+function tickRecording(){
+  if(!recording) return;
+  var total = Math.max(1, anim.loop) * 1000;
+  var left = recStop - performance.now();
+  setProgress(1 - Math.max(0, left) / total);
+  if(left <= 0 && recorder && recorder.state === 'recording'){
+    try{ recorder.stop(); }catch(e){ recording = false; hideBusy(); }
+  }
+}
+
+/* ---------------------------------------------------------------------
+   PERSISTENCE  -  every access guarded, so a browser with storage
+   disabled just quietly loses the memory and keeps working.
+   --------------------------------------------------------------------- */
+var STORE_KEY = 'fractal-flame-v1';
+var HANDOFF = 'fractal-flame-handoff';
+var saveTimer = 0;
+function saveSoon(){
+  if(!settings.store) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 700);
+}
+function saveNow(){
+  if(!settings.store || saver) return;   /* saver flames are throwaway */
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify({v:1, flame:flame, settings:settings, anim:anim}));
+  }catch(e){ /* private mode, quota, disabled - not worth interrupting the user */ }
+}
+function loadStored(){
+  var raw = null, handoff = false;
+  /* a renderer restart hands the live flame across so nothing is lost */
+  try{
+    raw = sessionStorage.getItem(HANDOFF);
+    if(raw){ sessionStorage.removeItem(HANDOFF); handoff = true; }
+  }catch(e){ raw = null; }
+  if(!raw){
+    try{ raw = localStorage.getItem(STORE_KEY); }catch(e){ return false; }
+  }
+  if(!raw) return false;
+  try{
+    var o = JSON.parse(raw);
+    if(!o || !o.flame) return false;
+    flame = normalizeFlame(o.flame);
+    if(o.settings){
+      var k;
+      for(k in settings) if(o.settings[k] !== undefined && typeof o.settings[k] === typeof settings[k]) settings[k] = o.settings[k];
+    }
+    if(o.anim){
+      var a;
+      for(a in anim) if(o.anim[a] !== undefined && typeof o.anim[a] === typeof anim[a]) anim[a] = o.anim[a];
+      anim.on = false;      /* never start up already animating */
+    }
+    budgetPts = Math.max(20000, settings.budget*1000);
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ---------------------------------------------------------------------
+   KEYS, FULLSCREEN, RESIZE
+   --------------------------------------------------------------------- */
+function toggleFullscreen(){
+  var d = document, e = d.documentElement;
+  try{
+    if(!d.fullscreenElement && !d.webkitFullscreenElement){
+      if(e.requestFullscreen){ var p = e.requestFullscreen(); if(p && p['catch']) p['catch'](function(){}); }
+      else if(e.webkitRequestFullscreen) e.webkitRequestFullscreen();
+    } else {
+      if(d.exitFullscreen){ var q = d.exitFullscreen(); if(q && q['catch']) q['catch'](function(){}); }
+      else if(d.webkitExitFullscreen) d.webkitExitFullscreen();
+    }
+  }catch(err){}
+}
+
+window.addEventListener('keydown', function(e){
+  poke();
+  if(saver){
+    exitSaver(); syncUI();
+    if(e.key === 's' || e.key === 'S') return;
+    return;
+  }
+  var tn = e.target && e.target.tagName;
+  if(tn === 'INPUT' || tn === 'SELECT' || tn === 'TEXTAREA'){
+    if((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')){ e.preventDefault(); undo(); }
+    return;
+  }
+  var k = e.key;
+  if((e.ctrlKey || e.metaKey) && (k === 'z' || k === 'Z')){ e.preventDefault(); if(e.shiftKey) redo(); else undo(); return; }
+  if((e.ctrlKey || e.metaKey) && (k === 'y' || k === 'Y')){ e.preventDefault(); redo(); return; }
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+
+  if(k === ' '){ e.preventDefault(); paused = !paused; syncUI(); }
+  else if(k === 'r' || k === 'R'){ commit(); randomize(); syncUI(); buildPaletteEditor(); saveSoon(); toast('New flame'); }
+  else if(k === 'm' || k === 'M'){ commit(); mutateFlame(1); syncUI(); buildPaletteEditor(); saveSoon(); toast('Mutated'); }
+  else if(k === 'a' || k === 'A'){ toggleAnimate(); }
+  else if(k === 's' || k === 'S'){ enterSaver(); syncUI(); }
+  else if(k === 'f' || k === 'F'){ toggleFullscreen(); }
+  else if(k === 'h' || k === 'H'){
+    hideUI = !hideUI;
+    document.body.classList.toggle('hideui', hideUI);
+    drawOverlay();
+  }
+  else if(k === 'p' || k === 'P'){ exportPNG(); }
+  else if(k >= '1' && k <= '6'){
+    var i = (+k) - 1;
+    if(i < flame.xforms.length){ selX = i; syncTransformUI(); drawOverlay(); }
+  }
+});
+
+window.addEventListener('pointerdown', function(){ poke(); if(saver){ exitSaver(); syncUI(); } }, true);
+window.addEventListener('pointermove', function(){
+  poke();
+  if(saver && !justEntered()) { exitSaver(); syncUI(); }
+}, {passive:true});
+var saverEnteredAt = 0;
+function justEntered(){ return performance.now() - saverEnteredAt < 700; }
+
+var resizeTimer = 0;
+window.addEventListener('resize', function(){
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function(){
+    allocate();
+    updateMultLabel();
+    drawPalBar();
+    drawOverlay();
+  }, 120);
+});
+
+/* ---------------------------------------------------------------------
+   INIT
+   --------------------------------------------------------------------- */
+(function init(){
+  var i, o;
+  var ps = $('selPreset');
+  o = document.createElement('option'); o.value = '-1'; o.textContent = 'Classic IFS presets…'; ps.appendChild(o);
+  for(i = 0; i < PRESETS.length; i++){
+    o = document.createElement('option'); o.value = String(i); o.textContent = PRESETS[i].name; ps.appendChild(o);
+  }
+  var sel = $('selPal');
+  o = document.createElement('option'); o.value = '-1'; o.textContent = 'Custom'; sel.appendChild(o);
+  for(i = 0; i < PALETTES.length; i++){
+    o = document.createElement('option'); o.value = String(i); o.textContent = PALETTES[i].name;
+    sel.appendChild(o);
+  }
+
+  buildAffine();
+  buildVariationList();
+
+  var restored = loadStored();
+  compile();
+  allocate();
+  if(!restored) autoFit(); else resetAccumulation();
+
+  lastCommitted = snapshot();
+  lastInput = performance.now();
+  syncUI();
+  buildPaletteEditor();
+  drawOverlay();
+  requestAnimationFrame(frame);
+})();
+
+window.flameApp = {
+  get flame(){ return flame; },
+  settings: settings,
+  anim: anim,
+  animate: function(on){ if(on !== anim.on) toggleAnimate(); },
+  preset: applyPreset,
+  randomize: function(){ randomize(); syncUI(); buildPaletteEditor(); },
+  mutate: function(a){ mutateFlame(a); syncUI(); buildPaletteEditor(); },
+  probe: function(){ return probe(20000); },
+  enterSaver: function(){ enterSaver(); syncUI(); },
+  nextSaver: nextSaverFlame,
+  exitSaver: function(){ exitSaver(); syncUI(); },
+  iterate: function(n){ iterate(n); dirtyDisplay = true; },
+  render: function(){ toneMap(); dirtyDisplay = false; },
+  get phase(){ return animPhase; },
+  poseSnapshot: function(u){
+    var keep = animPhase, out, i;
+    animPhase = u; applyAnimation();
+    out = Array.prototype.slice.call(ca);
+    for(i = 0; i < vW.length; i++) out.push(vW[i]);
+    out.push(viewZoomMul, viewRotAdd, palAnimOff);
+    animPhase = keep; applyAnimation();
+    return out;
+  },
+  benchGPU: function(frames, rounds){
+    if(!gpuOn) return null;
+    var k = gpuK, i;
+    if(rounds) gpuK = rounds;
+    gpuUploadFlame(); gpuRender(0.016); gl.finish();
+    var t0 = performance.now();
+    for(i = 0; i < frames; i++) gpuRender(0.016);
+    gl.finish();
+    var ms = performance.now() - t0;
+    var pts = frames * gpuK * GP * GP;
+    var out = {frames: frames, rounds: gpuK, ms: ms, msPerFrame: ms/frames,
+               samplesPerSec: pts / (ms/1000), cells: histW*histH};
+    gpuK = k;
+    return out;
+  },
+  gpu: function(){ return {on: gpuOn, why: gpuWhy, rounds: gpuK, particles: GP*GP,
+                           dmax: gpuDmax, cells: histW*histH}; },
+  stats: function(){ return {samples: totalSamples, dmax: gpuOn ? gpuDmax : dmax, hist: histW + 'x' + histH,
+                             quality: totalSamples/(histW*histH)}; }
+};
+
+})();
+</script>
+</body>
+</html>
