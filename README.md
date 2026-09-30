@@ -58,6 +58,25 @@ To run this inside another page or an app's webview, point an iframe at it:
 the browser blocks fullscreen requests from an iframe that has not been
 granted it, and reports no error.
 
+### If it loads as a black rectangle
+
+The canvas takes its size from its container when the page loads. If the
+container has no size yet at that moment — common in an app webview that lays
+itself out after loading, or a hidden tab that gets shown later — the canvas
+starts at 16×16 and you get a black box that never fills in.
+
+It listens for `resize`, so nudging it once is enough:
+
+```js
+iframe.contentWindow.dispatchEvent(new Event('resize'));
+```
+
+Call that after the container has real dimensions. Giving the iframe an
+explicit width and height before it loads avoids the problem entirely.
+
+The status line in the top right reports the buffer size, so `16×16` there
+confirms this is what happened rather than something else.
+
 ## Built with
 
 Claude, in a browser, with no dependencies. The whole program is `index.html`.
